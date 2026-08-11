@@ -61,15 +61,15 @@ function Footer() {
             </h3>
 
             <div className="mt-4 space-y-3">
-              <div className="flex items-center gap-2 text-sm text-[#71827E]">
+              <Link to="/privacy" className="flex items-center gap-2 text-sm text-[#71827E] hover:text-[#2D7A6D]">
                 <Lock size={16} />
                 Privacy Policy
-              </div>
+              </Link>
 
-              <div className="flex items-center gap-2 text-sm text-[#71827E]">
+              <Link to="/terms" className="flex items-center gap-2 text-sm text-[#71827E] hover:text-[#2D7A6D]">
                 <ShieldCheck size={16} />
                 Terms & Conditions
-              </div>
+              </Link>
 
               <div className="flex items-center gap-2 text-sm text-[#71827E]">
                 <Mail size={16} />

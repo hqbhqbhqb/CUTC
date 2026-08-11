@@ -4,6 +4,7 @@ function Button({
   type = "button",
   variant = "primary",
   className = "",
+  disabled = false,
 }) {
   const variants = {
     primary: "bg-[#2D7A6D] text-white hover:bg-[#24665B]",
@@ -17,9 +18,10 @@ function Button({
     <button
       type={type}
       onClick={onClick}
+      disabled={disabled}
       className={`
         rounded-xl px-5 py-3
-        font-medium transition
+        font-medium transition disabled:cursor-not-allowed disabled:opacity-45
         ${variants[variant]}
         ${className}
       `}

@@ -66,7 +66,7 @@ function MedicationList({ medications, type, onRemove }) {
 
                 <span className="flex items-center gap-1">
                   <Clock3 size={13} />
-                  {medication.time}
+                  {medication.times.join(" · ")}
                 </span>
               </div>
             </div>

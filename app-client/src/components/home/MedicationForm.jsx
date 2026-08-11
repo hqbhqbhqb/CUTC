@@ -4,13 +4,13 @@ import { useState } from "react";
 import Card from "../common/Card";
 import Button from "../common/Button";
 
-function MedicationForm({ type, medications, setMedications }) {
+function MedicationForm({ type, onAdd }) {
   const isTopical = type === "topical";
 
   const [form, setForm] = useState({
     name: "",
     frequency: 1,
-    time: "08:00",
+    times: ["08:00"],
   });
 
   const handleChange = (field, value) => {
@@ -20,6 +20,15 @@ function MedicationForm({ type, medications, setMedications }) {
     }));
   };
 
+  const changeFrequency = (frequency) => {
+    setForm((current) => {
+      const times = Array.from({ length: frequency }, (_, index) =>
+        current.times[index] || `${String(Math.min(8 + index * 6, 23)).padStart(2, "0")}:00`,
+      );
+      return { ...current, frequency, times };
+    });
+  };
+
   const addMedication = () => {
     if (!form.name.trim()) return;
 
@@ -27,17 +36,16 @@ function MedicationForm({ type, medications, setMedications }) {
       id: Date.now(),
       name: form.name.trim(),
       frequency: form.frequency,
-      time: form.time,
+      times: form.times,
       type,
     };
-
-    setMedications([...medications, newMedication]);
+    onAdd(newMedication);
 
     // Reset form
     setForm({
       name: "",
       frequency: 1,
-      time: "08:00",
+      times: ["08:00"],
     });
   };
 
@@ -96,9 +104,7 @@ function MedicationForm({ type, medications, setMedications }) {
 
             <select
               value={form.frequency}
-              onChange={(e) =>
-                handleChange("frequency", Number(e.target.value))
-              }
+              onChange={(e) => changeFrequency(Number(e.target.value))}
               className="
                 w-full rounded-xl
                 border border-[#D6E4E1]
@@ -119,28 +125,17 @@ function MedicationForm({ type, medications, setMedications }) {
             </select>
           </div>
 
-          {/* Time */}
-          <div>
-            <label className="mb-2 block text-sm font-medium text-[#38534E]">
-              Khung giờ
-            </label>
-
-            <input
-              type="time"
-              value={form.time}
-              onChange={(e) => handleChange("time", e.target.value)}
-              className="
-                w-full rounded-xl
-                border border-[#D6E4E1]
-                bg-white px-4 py-3
-                text-sm
-                outline-none
-                transition
-                focus:border-[#2D7A6D]
-                focus:ring-2
-                focus:ring-[#2D7A6D]/10
-              "
-            />
+          <div className="sm:col-span-2">
+            <label className="mb-2 block text-sm font-medium text-[#38534E]">Khung giờ dùng thuốc</label>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {form.times.map((time, index) => (
+                <input key={index} type="time" value={time} onChange={(event) => {
+                  const times = [...form.times];
+                  times[index] = event.target.value;
+                  handleChange("times", times);
+                }} className="w-full rounded-xl border border-[#D6E4E1] bg-white px-4 py-3 text-sm outline-none focus:border-[#2D7A6D] focus:ring-2 focus:ring-[#2D7A6D]/10" />
+              ))}
+            </div>
           </div>
         </div>
 

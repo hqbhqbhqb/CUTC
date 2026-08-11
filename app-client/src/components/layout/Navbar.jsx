@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { Link, NavLink } from "react-router-dom";
-import { UserCircle, Stethoscope, Menu, X } from "lucide-react";
+import { UserCircle, Stethoscope, Menu, X, LogIn, LogOut } from "lucide-react";
 
 import PageContainer from "./PageContainer";
+import { useApp } from "../../store/useApp";
 
 function Navbar() {
   const [open, setOpen] = useState(false);
+  const { user, logout } = useApp();
 
   const links = [
     {
@@ -78,13 +80,22 @@ function Navbar() {
 
         {/* Desktop profile */}
 
-        <Link
-          to="/profile"
-          className="hidden items-center gap-2 rounded-xl bg-[#EFF6F4] px-4 py-2 text-sm font-medium text-[#315D56] md:flex"
-        >
-          <UserCircle size={19} />
-          Alex
-        </Link>
+        <div className="hidden items-center gap-2 md:flex">
+          {user ? (
+            <>
+              <Link to="/profile" className="flex items-center gap-2 rounded-xl bg-[#EFF6F4] px-4 py-2 text-sm font-medium text-[#315D56]">
+                <UserCircle size={19} /> {user.username}
+              </Link>
+              <button type="button" onClick={logout} className="rounded-xl p-2.5 text-[#6f817d] hover:bg-[#f1f6f4]" aria-label="Đăng xuất">
+                <LogOut size={18} />
+              </button>
+            </>
+          ) : (
+            <Link to="/login" className="flex items-center gap-2 rounded-xl bg-[#214d46] px-4 py-2.5 text-sm font-semibold text-white">
+              <LogIn size={18} /> Đăng nhập
+            </Link>
+          )}
+        </div>
 
         {/* Mobile menu button */}
 
@@ -150,6 +161,17 @@ function Navbar() {
                   {link.name}
                 </NavLink>
               ))}
+              <div className="mt-2 border-t border-[#e3ece9] pt-2">
+                {user ? (
+                  <button type="button" onClick={() => { logout(); setOpen(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-3 text-sm font-semibold text-[#49645F]">
+                    <LogOut size={18} /> Đăng xuất ({user.username})
+                  </button>
+                ) : (
+                  <Link to="/login" onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-lg px-3 py-3 text-sm font-semibold text-[#247568]">
+                    <LogIn size={18} /> Đăng nhập / Đăng ký
+                  </Link>
+                )}
+              </div>
             </nav>
           </PageContainer>
         </div>

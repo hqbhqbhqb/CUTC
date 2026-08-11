@@ -8,6 +8,7 @@ import Profile from "./pages/Profile";
 import AIAssistant from "./pages/AIAssistant";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import Legal from "./pages/Legal";
 
 function App() {
   return (
@@ -27,6 +28,8 @@ function App() {
           <Route path="/login" element={<Login />} />
 
           <Route path="/register" element={<Register />} />
+          <Route path="/terms" element={<Legal type="terms" />} />
+          <Route path="/privacy" element={<Legal type="privacy" />} />
         </Routes>
       </main>
 

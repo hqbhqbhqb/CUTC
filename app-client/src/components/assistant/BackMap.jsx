@@ -1,91 +1,23 @@
-function BackMap() {
-  const spots = [
-    {
-      id: 1,
-      x: "42%",
-      y: "27%",
-      completed: false,
-      active: true,
-    },
-    {
-      id: 2,
-      x: "57%",
-      y: "32%",
-      completed: false,
-      active: false,
-    },
-    {
-      id: 3,
-      x: "36%",
-      y: "48%",
-      completed: true,
-      active: false,
-    },
-    {
-      id: 4,
-      x: "62%",
-      y: "52%",
-      completed: false,
-      active: false,
-    },
-    {
-      id: 5,
-      x: "45%",
-      y: "68%",
-      completed: false,
-      active: false,
-    },
-  ];
-
+function BackMap({ targets = [], activeTargetId }) {
+  const completed = targets.filter((target) => target.completed).length;
   return (
-    <div className="relative mx-auto aspect-[3/4] max-h-[500px] w-full max-w-[380px] rounded-[45%] bg-[#E5EFEC]">
-      {/* Spine */}
-
-      <div className="absolute left-1/2 top-[10%] h-[80%] w-px -translate-x-1/2 bg-[#C4D8D3]" />
-
-      {/* Left / right areas */}
-
-      <div className="absolute left-[8%] top-[42%] rounded-full bg-[#D8EAE6] px-3 py-1 text-[10px] text-[#5C7771]">
-        LEFT
+    <div className="rounded-3xl border border-[#dce9e6] bg-white p-5 shadow-[0_8px_30px_rgba(31,78,70,0.05)]">
+      <div className="mb-4 flex items-center justify-between">
+        <div><p className="text-xs font-bold tracking-[0.14em] text-[#2d7a6d]">BẢN ĐỒ VÙNG LƯNG</p><h3 className="mt-1 font-bold text-[#193b35]">Trái trước · Phải sau</h3></div>
+        <span className="rounded-full bg-[#eef6f3] px-3 py-1 text-xs font-bold text-[#39766b]">{completed}/{targets.length || 0}</span>
       </div>
-
-      <div className="absolute right-[8%] top-[42%] rounded-full bg-[#D8EAE6] px-3 py-1 text-[10px] text-[#5C7771]">
-        RIGHT
-      </div>
-
-      {/* Lesions */}
-
-      {spots.map((spot) => (
-        <div
-          key={spot.id}
-          className="absolute"
-          style={{
-            left: spot.x,
-            top: spot.y,
-          }}
-        >
-          <div
-            className={`
-              flex h-8 w-8 -translate-x-1/2 -translate-y-1/2
-              items-center justify-center rounded-full
-              text-xs font-bold
-              transition
-              ${
-                spot.completed
-                  ? "bg-[#7FB4A8] text-white opacity-50"
-                  : spot.active
-                    ? "animate-pulse bg-[#D95F5F] text-white ring-8 ring-[#D95F5F]/20"
-                    : "bg-[#E9A3A3] text-white"
-              }
-            `}
-          >
-            {spot.id}
-          </div>
-        </div>
-      ))}
-
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 rounded-full bg-white px-4 py-2 text-xs font-medium text-[#4C6761] shadow">
-        1 / 5 targets
+      <div className="relative mx-auto aspect-[3/4] max-h-[430px] w-full max-w-[330px] overflow-hidden rounded-[44%_44%_34%_34%] border border-[#d3e4df] bg-[linear-gradient(90deg,#e8f2ef_0_49.8%,#d0e1dd_50%,#edf5f3_50.2%)]">
+        <div className="absolute left-[12%] top-[44%] rounded-full bg-white/75 px-3 py-1 text-[10px] font-bold text-[#68807a]">TRÁI</div>
+        <div className="absolute right-[12%] top-[44%] rounded-full bg-white/75 px-3 py-1 text-[10px] font-bold text-[#68807a]">PHẢI</div>
+        {targets.map((target) => {
+          const active = target.id === activeTargetId;
+          return (
+            <div key={target.id} className="absolute -translate-x-1/2 -translate-y-1/2" style={{ left: `${target.x * 100}%`, top: `${target.y * 100}%` }}>
+              <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold text-white transition ${target.completed ? "bg-[#66aa9c] opacity-45" : active ? "animate-pulse bg-[#e35f57] ring-8 ring-[#e35f57]/20" : "bg-[#dea59f]"}`}>{target.completed ? "✓" : target.id}</div>
+            </div>
+          );
+        })}
+        {targets.length === 0 && <div className="absolute inset-0 flex items-center justify-center px-10 text-center text-xs leading-5 text-[#7d908b]">Các vùng phát hiện sẽ xuất hiện tại đây sau khi đưa lưng vào khung.</div>}
       </div>
     </div>
   );
