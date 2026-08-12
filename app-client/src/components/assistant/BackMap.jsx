@@ -13,7 +13,7 @@ function BackMap({ targets = [], activeTargetId }) {
           const active = target.id === activeTargetId;
           return (
             <div key={target.id} className="absolute -translate-x-1/2 -translate-y-1/2" style={{ left: `${target.x * 100}%`, top: `${target.y * 100}%` }}>
-              <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold text-white transition ${target.completed ? "bg-[#66aa9c] opacity-45" : active ? "animate-pulse bg-[#e35f57] ring-8 ring-[#e35f57]/20" : "bg-[#dea59f]"}`}>{target.completed ? "✓" : target.id}</div>
+              <div className={`flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-bold text-white transition ${target.completed ? "bg-[#66aa9c] opacity-45" : active ? "animate-pulse bg-[#e35f57] ring-8 ring-[#e35f57]/20" : "bg-[#dea59f]"}`}>{target.completed ? "✓" : target.coverage ? `${Math.round(target.coverage * 100)}%` : target.id}</div>
             </div>
           );
         })}

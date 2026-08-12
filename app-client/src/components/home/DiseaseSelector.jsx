@@ -16,6 +16,12 @@ function DiseaseSelector({ selected, setSelected }) {
       description: "Theo dõi và nhắc nhở quá trình điều trị",
       icon: "○",
     },
+    {
+      id: "acne",
+      name: "Mụn lưng",
+      description: "Hỗ trợ phủ thuốc lên từng vùng mụn theo chỉ định",
+      icon: "✦",
+    },
   ];
 
   return (
@@ -24,7 +30,7 @@ function DiseaseSelector({ selected, setSelected }) {
         Bạn đang điều trị vấn đề nào?
       </h2>
 
-      <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-3">
         {diseases.map((disease) => {
           const active = selected === disease.id;
 

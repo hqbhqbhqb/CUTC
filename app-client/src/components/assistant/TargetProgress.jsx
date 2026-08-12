@@ -10,7 +10,7 @@ function TargetProgress({ targets = [], activeTargetId }) {
         {targets.map((target) => (
           <div key={target.id} className={`flex items-center gap-2 rounded-xl border p-3 ${target.id === activeTargetId ? "border-[#e37b72] bg-[#fff4f3]" : "border-[#e3ece9]"}`}>
             {target.completed ? <CheckCircle2 size={19} className="text-[#2d7a6d]" /> : <Circle size={19} className={target.id === activeTargetId ? "text-[#d95f5f]" : "text-[#c9d8d5]"} />}
-            <span className={`text-sm ${target.completed ? "text-[#83918d] line-through" : "font-semibold"}`}>Target #{target.id}</span>
+            <span className={`text-sm ${target.completed ? "text-[#83918d] line-through" : "font-semibold"}`}>Target #{target.id}{!target.completed ? ` · ${Math.round((target.coverage || 0) * 100)}%` : ""}</span>
           </div>
         ))}
         {targets.length === 0 && <p className="col-span-2 py-3 text-center text-sm text-[#82928e]">Chưa phát hiện target.</p>}

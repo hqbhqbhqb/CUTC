@@ -2,7 +2,7 @@ import { Hand, Volume2 } from "lucide-react";
 import Card from "../common/Card";
 import ProgressBar from "../common/ProgressBar";
 
-function AIGuidance({ guidance, targetNumber, holding, holdProgress, handVisible, phase }) {
+function AIGuidance({ guidance, targetNumber, holding, holdProgress, coverageProgress, contactProgress, handVisible, phase }) {
   const label = phase === "guiding" ? guidance.label : phase === "completed" ? "Đã hoàn thành" : "Đang chờ nhận diện";
   return (
     <Card className="p-6">
@@ -17,10 +17,22 @@ function AIGuidance({ guidance, targetNumber, holding, holdProgress, handVisible
         </div>
         <p className="mt-4 text-lg font-bold uppercase tracking-[0.16em] text-[#2d7a6d]">{label}</p>
       </div>
-      {holding && <div className="mt-5"><div className="mb-2 flex justify-between text-xs font-semibold text-[#527069]"><span>Giữ sát và xoa nhẹ</span><span>{Math.round(holdProgress)}%</span></div><ProgressBar value={holdProgress} /></div>}
+      {targetNumber && (
+        <div className="mt-5 space-y-4">
+          <div>
+            <div className="mb-2 flex justify-between text-xs font-semibold text-[#527069]"><span>Diện tích đã phủ</span><span>{Math.round(coverageProgress)}%</span></div>
+            <ProgressBar value={coverageProgress} />
+          </div>
+          <div>
+            <div className="mb-2 flex justify-between text-xs font-semibold text-[#527069]"><span>Thời gian tiếp xúc</span><span>{Math.round(contactProgress)}%</span></div>
+            <ProgressBar value={contactProgress} />
+          </div>
+          <p className="text-xs leading-5 text-[#71827e]">Hoàn thành khi phủ ít nhất 90% vùng, tiếp xúc đủ 3 giây và có chuyển động xoa.</p>
+        </div>
+      )}
       <div className={`mt-5 flex items-center gap-3 rounded-xl p-4 ${holding ? "bg-[#e8f7f1] text-[#316a5f]" : "bg-[#fff7e8] text-[#765c2f]"}`}>
         <div className={`h-3 w-3 rounded-full ${holding ? "animate-ping bg-[#2d9c7f]" : "animate-pulse bg-[#e3a43b]"}`} />
-        <p className="text-sm">{holding ? "Nghe tiếng tít: giữ 3,5 giây và di chuyển nhẹ trong vùng." : "Dùng ngón trỏ, cụp các ngón còn lại và di chuyển chậm."}</p>
+        <p className="text-sm">{holding ? `Đang phủ vùng mới · tiến độ tổng ${Math.round(holdProgress)}%.` : "Làm theo hướng dẫn để di chuyển tới phần chưa được phủ."}</p>
       </div>
     </Card>
   );

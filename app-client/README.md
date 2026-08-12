@@ -9,10 +9,11 @@ MVP web hỗ trợ người dùng tự bôi thuốc ở vùng lưng bằng camer
 - Đăng ký/đăng nhập cục bộ, điều khoản và chính sách quyền riêng tư.
 - Lưu nhiều thuốc bôi/uống, số lần và nhiều khung giờ mỗi ngày.
 - Task schedule, chỉnh giờ, đánh dấu hoàn thành và contribution chart 30 ngày.
-- Camera chạy MediaPipe trên thiết bị, không upload hay lưu khung hình.
-- Tìm vùng da sáng theo màu, xử lý nửa lưng trái trước rồi nửa phải.
+- Camera chạy MediaPipe Pose + Hand Landmarker trên thiết bị, không upload hay lưu khung hình.
+- Chỉ quét sau khi thấy đủ vai–hông và xác nhận người đang quay lưng; đèn/nền sáng không được tạo target nếu thiếu pose hợp lệ.
+- Hỗ trợ phác đồ lang ben, hắc lào và mụn lưng; xử lý nửa lưng trái trước rồi nửa phải.
 - Hướng dẫn ngón trỏ bằng tiếng Việt, kêu “tít” trong vùng target.
-- Chỉ hoàn thành target sau khi giữ sát và xoa nhẹ khoảng 3,5 giây.
+- Hiển thị bản đồ phủ theo hình dạng vùng; chỉ hoàn thành khi phủ ít nhất 90%, tiếp xúc đủ 3 giây và có chuyển động xoa.
 
 ## Chạy local
 
@@ -46,6 +47,7 @@ Camera chỉ hoạt động trong secure context: `localhost` khi phát triển 
 
 ```bash
 npm run lint
+npm run test:vision
 npm run build
 npm run preview
 ```

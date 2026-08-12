@@ -1,43 +1,82 @@
 import { useEffect, useRef, useState } from "react";
 import { Camera, CameraIcon, RefreshCw, Scan, ShieldCheck } from "lucide-react";
-import { FilesetResolver, HandLandmarker } from "@mediapipe/tasks-vision";
+import { FilesetResolver, HandLandmarker, PoseLandmarker } from "@mediapipe/tasks-vision";
 import Card from "../common/Card";
-import { analyzeFrame } from "../../lib/vision";
+import { analyzeFrame, getPoseTorso } from "../../lib/vision";
 
-function drawOverlay(canvas, { backVisible, spots }, finger, targets, activeTargetId) {
+function drawOverlay(canvas, analysis, finger, targets, activeTargetId) {
   const context = canvas.getContext("2d");
   const { width, height } = canvas;
   context.clearRect(0, 0, width, height);
 
-  context.strokeStyle = backVisible ? "rgba(80, 226, 186, .85)" : "rgba(255,255,255,.62)";
-  context.lineWidth = 2;
-  context.setLineDash([10, 8]);
-  context.beginPath();
-  context.ellipse(width * 0.5, height * 0.52, width * 0.35, height * 0.46, 0, 0, Math.PI * 2);
-  context.stroke();
-  context.setLineDash([]);
+  if (analysis.torsoPolygon?.length) {
+    context.strokeStyle = analysis.backVisible ? "rgba(80, 226, 186, .95)" : "rgba(255, 190, 92, .9)";
+    context.fillStyle = analysis.backVisible ? "rgba(80, 226, 186, .06)" : "rgba(255, 190, 92, .06)";
+    context.lineWidth = 3;
+    context.setLineDash([10, 8]);
+    context.beginPath();
+    analysis.torsoPolygon.forEach((point, index) => {
+      const x = point.x * width;
+      const y = point.y * height;
+      if (index === 0) context.moveTo(x, y);
+      else context.lineTo(x, y);
+    });
+    context.closePath();
+    context.fill();
+    context.stroke();
+    context.setLineDash([]);
+  } else {
+    context.strokeStyle = "rgba(255,255,255,.55)";
+    context.lineWidth = 2;
+    context.setLineDash([10, 8]);
+    context.strokeRect(width * 0.26, height * 0.12, width * 0.48, height * 0.76);
+    context.setLineDash([]);
+  }
 
-  const visibleTargets = targets.length ? targets : spots;
+  const visibleTargets = targets.length ? targets : analysis.spots;
   visibleTargets.forEach((target, index) => {
     const x = target.x * width;
     const y = target.y * height;
     const isActive = target.id === activeTargetId;
-    context.beginPath();
-    context.arc(x, y, Math.max((target.radius || 0.035) * width, 11), 0, Math.PI * 2);
-    context.fillStyle = target.completed
-      ? "rgba(50, 181, 142, .25)"
-      : isActive
-        ? "rgba(255, 91, 82, .42)"
-        : "rgba(255, 211, 103, .30)";
-    context.fill();
+
+    target.cells?.forEach((cell, cellIndex) => {
+      const covered = target.coveredCells?.[cellIndex];
+      context.beginPath();
+      context.arc(cell.x * width, cell.y * height, isActive ? 5 : 4, 0, Math.PI * 2);
+      context.fillStyle = target.completed || covered
+        ? "rgba(76, 224, 177, .78)"
+        : isActive
+          ? "rgba(255, 91, 82, .78)"
+          : "rgba(255, 211, 103, .56)";
+      context.fill();
+    });
+
     context.strokeStyle = target.completed ? "#63d3b1" : isActive ? "#ff766c" : "#ffe39a";
-    context.lineWidth = isActive ? 4 : 2;
+    context.lineWidth = isActive ? 3 : 2;
+    context.beginPath();
+    context.ellipse(
+      x,
+      y,
+      Math.max((target.radiusX || 0.025) * width, 10),
+      Math.max((target.radiusY || 0.025) * height, 10),
+      0,
+      0,
+      Math.PI * 2,
+    );
     context.stroke();
     context.fillStyle = "white";
     context.font = "bold 12px Inter, sans-serif";
     context.textAlign = "center";
     context.textBaseline = "middle";
     context.fillText(String(target.id || index + 1), x, y);
+
+    if (isActive && target.nextPoint && !target.completed) {
+      context.beginPath();
+      context.arc(target.nextPoint.x * width, target.nextPoint.y * height, 11, 0, Math.PI * 2);
+      context.strokeStyle = "#65e6ff";
+      context.lineWidth = 3;
+      context.stroke();
+    }
   });
 
   if (finger) {
@@ -58,7 +97,7 @@ function drawOverlay(canvas, { backVisible, spots }, finger, targets, activeTarg
   }
 }
 
-function CameraView({ active, targets = [], activeTargetId, sensitivity, onFrame, onReady, onError }) {
+function CameraView({ active, targets = [], activeTargetId, sensitivity, condition, onFrame, onReady, onError }) {
   const videoRef = useRef(null);
   const overlayRef = useRef(null);
   const analysisCanvasRef = useRef(document.createElement("canvas"));
@@ -68,6 +107,7 @@ function CameraView({ active, targets = [], activeTargetId, sensitivity, onFrame
   const targetsRef = useRef(targets);
   const activeTargetRef = useRef(activeTargetId);
   const sensitivityRef = useRef(sensitivity);
+  const conditionRef = useRef(condition);
   const [cameraReady, setCameraReady] = useState(false);
   const [modelReady, setModelReady] = useState(false);
   const [facingMode, setFacingMode] = useState("user");
@@ -78,6 +118,7 @@ function CameraView({ active, targets = [], activeTargetId, sensitivity, onFrame
   useEffect(() => { targetsRef.current = targets; }, [targets]);
   useEffect(() => { activeTargetRef.current = activeTargetId; }, [activeTargetId]);
   useEffect(() => { sensitivityRef.current = sensitivity; }, [sensitivity]);
+  useEffect(() => { conditionRef.current = condition; }, [condition]);
 
   useEffect(() => {
     if (!active) {
@@ -89,10 +130,21 @@ function CameraView({ active, targets = [], activeTargetId, sensitivity, onFrame
     let cancelled = false;
     let stream;
     let handLandmarker;
+    let poseLandmarker;
     let animationFrame;
     let lastAnalysisAt = 0;
     let lastHandAt = 0;
-    let latestAnalysis = { backVisible: false, spots: [], skinRatio: 0 };
+    let lastPoseAt = 0;
+    let poseConfirmationFrames = 0;
+    let latestPose = { personVisible: false, backFacing: false, polygon: null };
+    let latestAnalysis = {
+      backVisible: false,
+      personVisible: false,
+      backFacing: false,
+      torsoPolygon: null,
+      spots: [],
+      skinRatio: 0,
+    };
     let latestFinger = null;
     const videoElement = videoRef.current;
 
@@ -126,6 +178,25 @@ function CameraView({ active, targets = [], activeTargetId, sensitivity, onFrame
             minTrackingConfidence: 0.45,
           });
         }
+        try {
+          poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
+            baseOptions: { modelAssetPath: "/models/pose_landmarker_lite.task", delegate: "GPU" },
+            runningMode: "VIDEO",
+            numPoses: 1,
+            minPoseDetectionConfidence: 0.6,
+            minPosePresenceConfidence: 0.6,
+            minTrackingConfidence: 0.6,
+          });
+        } catch {
+          poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
+            baseOptions: { modelAssetPath: "/models/pose_landmarker_lite.task", delegate: "CPU" },
+            runningMode: "VIDEO",
+            numPoses: 1,
+            minPoseDetectionConfidence: 0.6,
+            minPosePresenceConfidence: 0.6,
+            minTrackingConfidence: 0.6,
+          });
+        }
         if (cancelled) return;
         setModelReady(true);
         onReadyRef.current?.();
@@ -149,6 +220,24 @@ function CameraView({ active, targets = [], activeTargetId, sensitivity, onFrame
         overlay.width = 720;
         overlay.height = Math.round(720 / aspect);
 
+        if (poseLandmarker && now - lastPoseAt > 140) {
+          try {
+            const poseResult = poseLandmarker.detectForVideo(video, now);
+            const pose = getPoseTorso(poseResult.landmarks?.[0]);
+            if (pose.backFacing) poseConfirmationFrames = Math.min(poseConfirmationFrames + 1, 6);
+            else poseConfirmationFrames = Math.max(poseConfirmationFrames - 2, 0);
+            latestPose = {
+              ...pose,
+              backFacing: pose.backFacing && poseConfirmationFrames >= 4,
+              polygon: pose.backFacing ? pose.polygon : null,
+            };
+          } catch {
+            poseConfirmationFrames = 0;
+            latestPose = { personVisible: false, backFacing: false, polygon: null };
+          }
+          lastPoseAt = now;
+        }
+
         if (now - lastAnalysisAt > 300) {
           const analysisCanvas = analysisCanvasRef.current;
           analysisCanvas.width = 360;
@@ -160,7 +249,14 @@ function CameraView({ active, targets = [], activeTargetId, sensitivity, onFrame
           context.drawImage(video, 0, 0, analysisCanvas.width, analysisCanvas.height);
           context.restore();
           const image = context.getImageData(0, 0, analysisCanvas.width, analysisCanvas.height);
-          latestAnalysis = analyzeFrame(image, analysisCanvas.width, analysisCanvas.height, sensitivityRef.current);
+          latestAnalysis = analyzeFrame(
+            image,
+            analysisCanvas.width,
+            analysisCanvas.height,
+            sensitivityRef.current,
+            latestPose,
+            conditionRef.current,
+          );
           lastAnalysisAt = now;
         }
 
@@ -186,6 +282,7 @@ function CameraView({ active, targets = [], activeTargetId, sensitivity, onFrame
       cancelled = true;
       cancelAnimationFrame(animationFrame);
       handLandmarker?.close?.();
+      poseLandmarker?.close?.();
       stream?.getTracks().forEach((track) => track.stop());
       if (videoElement) videoElement.srcObject = null;
     };
