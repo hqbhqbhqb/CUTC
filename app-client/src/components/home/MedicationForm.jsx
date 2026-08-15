@@ -54,11 +54,11 @@ function MedicationForm({ type, onAdd }) {
       {/* Header */}
       <div className="mb-6">
         <h3 className="text-lg font-bold text-[#214D46]">
-          {isTopical ? "Thuốc cần bôi" : "Thuốc cần uống"}
+          {isTopical ? "Topical medication" : "Oral medication"}
         </h3>
 
         <p className="mt-1 text-sm text-[#71827E]">
-          Thêm thuốc theo chỉ định của bác sĩ.
+          Add medication exactly as prescribed by your doctor.
         </p>
       </div>
 
@@ -67,7 +67,7 @@ function MedicationForm({ type, onAdd }) {
         {/* Medicine name */}
         <div>
           <label className="mb-2 block text-sm font-medium text-[#38534E]">
-            Tên thuốc
+            Medication name
           </label>
 
           <input
@@ -76,8 +76,8 @@ function MedicationForm({ type, onAdd }) {
             onChange={(e) => handleChange("name", e.target.value)}
             placeholder={
               isTopical
-                ? "Ví dụ: Ketoconazole cream"
-                : "Ví dụ: Ketoconazole tablet"
+                ? "Example: Ketoconazole cream"
+                : "Example: Ketoconazole tablet"
             }
             className="
               w-full rounded-xl
@@ -99,7 +99,7 @@ function MedicationForm({ type, onAdd }) {
           {/* Frequency */}
           <div>
             <label className="mb-2 block text-sm font-medium text-[#38534E]">
-              Số lần / ngày
+              Times per day
             </label>
 
             <select
@@ -119,14 +119,14 @@ function MedicationForm({ type, onAdd }) {
             >
               {[1, 2, 3, 4].map((num) => (
                 <option key={num} value={num}>
-                  {num} lần / ngày
+                  {num} {num === 1 ? "time" : "times"} per day
                 </option>
               ))}
             </select>
           </div>
 
           <div className="sm:col-span-2">
-            <label className="mb-2 block text-sm font-medium text-[#38534E]">Khung giờ dùng thuốc</label>
+            <label className="mb-2 block text-sm font-medium text-[#38534E]">Medication times</label>
             <div className="grid gap-2 sm:grid-cols-2">
               {form.times.map((time, index) => (
                 <input key={index} type="time" value={time} onChange={(event) => {
@@ -152,7 +152,7 @@ function MedicationForm({ type, onAdd }) {
           "
         >
           <Plus size={18} />
-          Thêm thuốc
+          Add medication
         </Button>
       </div>
     </Card>

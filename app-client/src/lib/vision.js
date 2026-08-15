@@ -26,7 +26,7 @@ function pointInPolygon(x, y, polygon) {
   return inside;
 }
 
-function expandFromCenter(point, center, scaleX, offsetY = 0) {
+function scaleFromCenter(point, center, scaleX, offsetY = 0) {
   return {
     x: clamp(center.x + (point.x - center.x) * scaleX, 0.02, 0.98),
     y: clamp(point.y + offsetY, 0.02, 0.98),
@@ -44,7 +44,7 @@ export function getPoseTorso(landmarks) {
   const rightHip = landmarks[24];
   const torsoLandmarks = [leftShoulder, rightShoulder, leftHip, rightHip];
   const visible = torsoLandmarks.every(
-    (point) => point && (point.visibility ?? 1) >= 0.58 && point.x >= 0 && point.x <= 1 && point.y >= 0 && point.y <= 1,
+    (point) => point && (point.visibility ?? 1) >= 0.42 && point.x >= 0 && point.x <= 1 && point.y >= 0 && point.y <= 1,
   );
   if (!visible) return { personVisible: false, backFacing: false, polygon: null };
 
@@ -54,12 +54,12 @@ export function getPoseTorso(landmarks) {
   const hipY = (leftHip.y + rightHip.y) / 2;
   const torsoHeight = hipY - shoulderY;
   const centered = Math.abs((leftShoulder.x + rightShoulder.x + leftHip.x + rightHip.x) / 4 - 0.5) < 0.34;
-  const sizedCorrectly = shoulderWidth > 0.17 && hipWidth > 0.1 && torsoHeight > 0.2;
+  const sizedCorrectly = shoulderWidth > 0.14 && hipWidth > 0.08 && torsoHeight > 0.17;
   const personVisible = centered && sizedCorrectly;
 
   // MediaPipe labels anatomical left/right. When the person's back faces the
   // unmirrored camera, their left shoulder appears on the image's left side.
-  const backFacing = personVisible && leftShoulder.x + 0.025 < rightShoulder.x;
+  const backFacing = personVisible && leftShoulder.x + 0.012 < rightShoulder.x;
   if (!backFacing) return { personVisible, backFacing: false, polygon: null };
 
   // The UI mirrors the camera, so mirror pose x coordinates to match the
@@ -77,11 +77,13 @@ export function getPoseTorso(landmarks) {
     y: (shoulders[0].y + shoulders[1].y + hips[0].y + hips[1].y) / 4,
   };
   const displayTorsoHeight = (hips[0].y + hips[1].y - shoulders[0].y - shoulders[1].y) / 2;
+  // Keep the detection ROI inside the shoulder/hip joints. Expanding the old
+  // polygon made bright walls immediately beside the body look like lesions.
   const polygon = [
-    expandFromCenter(shoulders[0], center, 1.16, -displayTorsoHeight * 0.08),
-    expandFromCenter(shoulders[1], center, 1.16, -displayTorsoHeight * 0.08),
-    expandFromCenter(hips[1], center, 1.12, displayTorsoHeight * 0.08),
-    expandFromCenter(hips[0], center, 1.12, displayTorsoHeight * 0.08),
+    scaleFromCenter(shoulders[0], center, 0.94, displayTorsoHeight * 0.025),
+    scaleFromCenter(shoulders[1], center, 0.94, displayTorsoHeight * 0.025),
+    scaleFromCenter(hips[1], center, 0.9, -displayTorsoHeight * 0.045),
+    scaleFromCenter(hips[0], center, 0.9, -displayTorsoHeight * 0.045),
   ];
 
   return { personVisible, backFacing, polygon };
@@ -99,7 +101,8 @@ function isCandidate(stats, averages, threshold, condition) {
     const paleCenter = stats.spread < 58 && stats.luma > averages.luma + threshold;
     return redEdge || paleCenter;
   }
-  return stats.spread < 52 && stats.luma > averages.luma + threshold;
+  const chromaDistance = Math.hypot(stats.cb - averages.cb, stats.cr - averages.cr);
+  return stats.spread < 68 && chromaDistance < 34 && stats.luma > averages.luma + threshold;
 }
 
 export function analyzeFrame(
@@ -111,7 +114,7 @@ export function analyzeFrame(
   condition = "pityriasis",
 ) {
   const { data } = imageData;
-  const step = 5;
+  const step = width >= 560 ? 4 : 5;
   if (!pose.personVisible || !pose.backFacing || !pose.polygon) {
     return {
       backVisible: false,
@@ -119,6 +122,7 @@ export function analyzeFrame(
       backFacing: pose.backFacing,
       torsoPolygon: pose.polygon,
       skinRatio: 0,
+      averageLuma: 0,
       spots: [],
     };
   }
@@ -152,7 +156,7 @@ export function analyzeFrame(
     cb: cbTotal / Math.max(skinCount, 1),
     cr: crTotal / Math.max(skinCount, 1),
   };
-  const backVisible = skinRatio > 0.38 && averages.luma > 52;
+  const backVisible = skinRatio > 0.34 && averages.luma > 45;
   if (!backVisible) {
     return {
       backVisible: false,
@@ -160,6 +164,7 @@ export function analyzeFrame(
       backFacing: true,
       torsoPolygon: pose.polygon,
       skinRatio,
+      averageLuma: averages.luma,
       spots: [],
     };
   }
@@ -167,18 +172,84 @@ export function analyzeFrame(
   const gridWidth = Math.ceil(width / step);
   const gridHeight = Math.ceil(height / step);
   const candidates = new Uint8Array(gridWidth * gridHeight);
-  const threshold = 13 + (1.5 - sensitivity) * 12;
+  const skinMask = new Uint8Array(gridWidth * gridHeight);
+  const statsGrid = new Array(gridWidth * gridHeight);
+  const threshold = 5 + (1.5 - sensitivity) * 6;
 
   for (let gy = 1; gy < gridHeight - 1; gy += 1) {
     const y = Math.min(gy * step, height - 1);
     for (let gx = 1; gx < gridWidth - 1; gx += 1) {
       const x = Math.min(gx * step, width - 1);
       if (!pointInPolygon(x / width, y / height, pose.polygon)) continue;
-      const [r, g, b] = getPixel(data, width, x, y);
-      const stats = colorStats(r, g, b);
-      if (isCandidate(stats, averages, threshold, condition)) {
-        candidates[gy * gridWidth + gx] = 1;
+      const stats = colorStats(...getPixel(data, width, x, y));
+      const index = gy * gridWidth + gx;
+      statsGrid[index] = stats;
+      const chromaDistance = Math.hypot(stats.cb - averages.cb, stats.cr - averages.cr);
+      if (
+        stats.luma > 35 &&
+        stats.cb > 68 && stats.cb < 158 &&
+        stats.cr > 108 && stats.cr < 215 &&
+        chromaDistance < 44
+      ) skinMask[index] = 1;
+    }
+  }
+
+  const integralWidth = gridWidth + 1;
+  const integralSize = integralWidth * (gridHeight + 1);
+  const integralCount = new Float64Array(integralSize);
+  const integralLuma = new Float64Array(integralSize);
+  const integralCb = new Float64Array(integralSize);
+  const integralCr = new Float64Array(integralSize);
+  for (let gy = 0; gy < gridHeight; gy += 1) {
+    let rowCount = 0;
+    let rowLuma = 0;
+    let rowCb = 0;
+    let rowCr = 0;
+    for (let gx = 0; gx < gridWidth; gx += 1) {
+      const gridIndex = gy * gridWidth + gx;
+      const stats = statsGrid[gridIndex];
+      if (skinMask[gridIndex] && stats) {
+        rowCount += 1;
+        rowLuma += stats.luma;
+        rowCb += stats.cb;
+        rowCr += stats.cr;
       }
+      const integralIndex = (gy + 1) * integralWidth + gx + 1;
+      const previousRowIndex = gy * integralWidth + gx + 1;
+      integralCount[integralIndex] = integralCount[previousRowIndex] + rowCount;
+      integralLuma[integralIndex] = integralLuma[previousRowIndex] + rowLuma;
+      integralCb[integralIndex] = integralCb[previousRowIndex] + rowCb;
+      integralCr[integralIndex] = integralCr[previousRowIndex] + rowCr;
+    }
+  }
+
+  const rectangleSum = (integral, left, top, right, bottom) => {
+    const x1 = clamp(left, 0, gridWidth);
+    const y1 = clamp(top, 0, gridHeight);
+    const x2 = clamp(right, 0, gridWidth);
+    const y2 = clamp(bottom, 0, gridHeight);
+    return integral[y2 * integralWidth + x2]
+      - integral[y1 * integralWidth + x2]
+      - integral[y2 * integralWidth + x1]
+      + integral[y1 * integralWidth + x1];
+  };
+
+  for (let gy = 1; gy < gridHeight - 1; gy += 1) {
+    for (let gx = 1; gx < gridWidth - 1; gx += 1) {
+      const index = gy * gridWidth + gx;
+      const stats = statsGrid[index];
+      if (!stats || !skinMask[index]) continue;
+
+      const outer = [gx - 4, gy - 4, gx + 5, gy + 5];
+      const inner = [gx - 1, gy - 1, gx + 2, gy + 2];
+      const localCount = rectangleSum(integralCount, ...outer) - rectangleSum(integralCount, ...inner);
+      if (localCount < 12) continue;
+      const localAverages = {
+        luma: (rectangleSum(integralLuma, ...outer) - rectangleSum(integralLuma, ...inner)) / localCount,
+        cb: (rectangleSum(integralCb, ...outer) - rectangleSum(integralCb, ...inner)) / localCount,
+        cr: (rectangleSum(integralCr, ...outer) - rectangleSum(integralCr, ...inner)) / localCount,
+      };
+      if (isCandidate(stats, localAverages, threshold, condition)) candidates[index] = 1;
     }
   }
 
@@ -254,6 +325,7 @@ export function analyzeFrame(
     backFacing: true,
     torsoPolygon: pose.polygon,
     skinRatio,
+    averageLuma: averages.luma,
     spots,
   };
 }
@@ -311,20 +383,20 @@ export function applyBrushCoverage(target, finger, deltaMs = 0, motionDelta = 0,
 
 export function getDirection(finger, targetPoint) {
   if (!finger || !targetPoint) {
-    return { key: "waiting", label: "Đưa ngón trỏ vào khung hình", arrows: [] };
+    return { key: "waiting", label: "Place your index finger in frame", arrows: [] };
   }
   const dx = targetPoint.x - finger.x;
   const dy = targetPoint.y - finger.y;
   const deadZone = 0.024;
   if (Math.hypot(dx, dy) < deadZone) {
-    return { key: "apply", label: "Xoa nhẹ tại đây", arrows: ["•"] };
+    return { key: "apply", label: "Apply and rub gently here", arrows: ["•"] };
   }
   if (Math.abs(dx) > Math.abs(dy)) {
     return dx > 0
-      ? { key: "right", label: "Sang phải", arrows: ["→", "→", "→"] }
-      : { key: "left", label: "Sang trái", arrows: ["←", "←", "←"] };
+      ? { key: "right", label: "Move right", arrows: ["→", "→", "→"] }
+      : { key: "left", label: "Move left", arrows: ["←", "←", "←"] };
   }
   return dy > 0
-    ? { key: "down", label: "Xuống dưới", arrows: ["↓", "↓", "↓"] }
-    : { key: "up", label: "Lên trên", arrows: ["↑", "↑", "↑"] };
+    ? { key: "down", label: "Move down", arrows: ["↓", "↓", "↓"] }
+    : { key: "up", label: "Move up", arrows: ["↑", "↑", "↑"] };
 }

@@ -14,13 +14,13 @@ function Footer() {
             </Link>
 
             <p className="mt-3 max-w-sm text-sm leading-6 text-[#71827E]">
-              Hỗ trợ người dùng theo dõi lịch thuốc và thực hiện quá trình chăm
-              sóc da một cách thuận tiện hơn.
+              Helping users follow medication schedules and apply prescribed
+              skin treatments more confidently.
             </p>
 
             <div className="mt-5 flex items-center gap-2 text-xs text-[#71827E]">
               <ShieldCheck size={16} className="text-[#2D7A6D]" />
-              Dữ liệu người dùng được bảo mật.
+              User data is protected.
             </div>
           </div>
 

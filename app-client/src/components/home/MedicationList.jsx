@@ -13,11 +13,11 @@ function MedicationList({ medications, type, onRemove }) {
           </div>
 
           <p className="mt-3 text-sm font-medium text-[#526A65]">
-            Chưa có thuốc nào
+            No medication added
           </p>
 
           <p className="mt-1 text-xs text-[#879691]">
-            Các thuốc bạn thêm sẽ xuất hiện ở đây.
+            Added medications will appear here.
           </p>
         </div>
       </Card>
@@ -28,11 +28,11 @@ function MedicationList({ medications, type, onRemove }) {
     <Card className="p-6">
       <div className="mb-5">
         <h3 className="text-lg font-bold">
-          {isTopical ? "Danh sách thuốc bôi" : "Danh sách thuốc uống"}
+          {isTopical ? "Topical medication list" : "Oral medication list"}
         </h3>
 
         <p className="mt-1 text-sm text-[#71827E]">
-          {medications.length} loại thuốc
+          {medications.length} {medications.length === 1 ? "medication" : "medications"}
         </p>
       </div>
 
@@ -62,7 +62,7 @@ function MedicationList({ medications, type, onRemove }) {
               </p>
 
               <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#83918D]">
-                <span>{medication.frequency} lần / ngày</span>
+                <span>{medication.frequency} {medication.frequency === 1 ? "time" : "times"} per day</span>
 
                 <span className="flex items-center gap-1">
                   <Clock3 size={13} />
@@ -75,7 +75,7 @@ function MedicationList({ medications, type, onRemove }) {
               type="button"
               onClick={() => onRemove(medication.id)}
               className="shrink-0 rounded-lg p-2 text-[#B85C5C] transition hover:bg-[#FBEAEA]"
-              aria-label={`Xóa ${medication.name}`}
+              aria-label={`Remove ${medication.name}`}
             >
               <Trash2 size={17} />
             </button>

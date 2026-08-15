@@ -12,7 +12,7 @@ function ApplicationGuide() {
             </div>
 
             <p className="text-sm font-medium text-[#52706A]">
-              Tư thế ngón tay
+              Finger position
             </p>
           </div>
         </div>
@@ -21,7 +21,7 @@ function ApplicationGuide() {
           <div className="mb-5 flex items-center gap-3">
             <Camera className="text-[#2D7A6D]" />
 
-            <h3 className="text-lg font-bold">Hướng dẫn trước khi bắt đầu</h3>
+            <h3 className="text-lg font-bold">Before you begin</h3>
           </div>
 
           <div className="space-y-4">
@@ -29,7 +29,7 @@ function ApplicationGuide() {
               <CheckCircle2 className="mt-0.5 shrink-0 text-[#2D7A6D]" />
 
               <p className="text-sm leading-6 text-[#526A65]">
-                Người dùng hãy dùng ngón trỏ và cụp các ngón còn lại.
+                Point with your index finger and keep the other fingers folded.
               </p>
             </div>
 
@@ -37,7 +37,7 @@ function ApplicationGuide() {
               <CheckCircle2 className="mt-0.5 shrink-0 text-[#2D7A6D]" />
 
               <p className="text-sm leading-6 text-[#526A65]">
-                Đưa lưng vào vùng camera để hệ thống có thể nhận diện vùng da.
+                Keep your back inside the camera frame so the system can scan the skin area.
               </p>
             </div>
 
@@ -45,7 +45,7 @@ function ApplicationGuide() {
               <CheckCircle2 className="mt-0.5 shrink-0 text-[#2D7A6D]" />
 
               <p className="text-sm leading-6 text-[#526A65]">
-                Giữ chuyển động chậm và làm theo hướng dẫn của AI Assistant.
+                Move slowly and follow the AI Assistant's voice guidance.
               </p>
             </div>
           </div>

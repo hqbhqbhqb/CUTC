@@ -86,13 +86,13 @@ function Navbar() {
               <Link to="/profile" className="flex items-center gap-2 rounded-xl bg-[#EFF6F4] px-4 py-2 text-sm font-medium text-[#315D56]">
                 <UserCircle size={19} /> {user.username}
               </Link>
-              <button type="button" onClick={logout} className="rounded-xl p-2.5 text-[#6f817d] hover:bg-[#f1f6f4]" aria-label="Đăng xuất">
+              <button type="button" onClick={logout} className="rounded-xl p-2.5 text-[#6f817d] hover:bg-[#f1f6f4]" aria-label="Sign out">
                 <LogOut size={18} />
               </button>
             </>
           ) : (
             <Link to="/login" className="flex items-center gap-2 rounded-xl bg-[#214d46] px-4 py-2.5 text-sm font-semibold text-white">
-              <LogIn size={18} /> Đăng nhập
+              <LogIn size={18} /> Sign in
             </Link>
           )}
         </div>
@@ -164,11 +164,11 @@ function Navbar() {
               <div className="mt-2 border-t border-[#e3ece9] pt-2">
                 {user ? (
                   <button type="button" onClick={() => { logout(); setOpen(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-3 text-sm font-semibold text-[#49645F]">
-                    <LogOut size={18} /> Đăng xuất ({user.username})
+                    <LogOut size={18} /> Sign out ({user.username})
                   </button>
                 ) : (
                   <Link to="/login" onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-lg px-3 py-3 text-sm font-semibold text-[#247568]">
-                    <LogIn size={18} /> Đăng nhập / Đăng ký
+                    <LogIn size={18} /> Sign in / Sign up
                   </Link>
                 )}
               </div>

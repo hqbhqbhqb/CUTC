@@ -4,6 +4,14 @@ import { FilesetResolver, HandLandmarker, PoseLandmarker } from "@mediapipe/task
 import Card from "../common/Card";
 import { analyzeFrame, getPoseTorso } from "../../lib/vision";
 
+function smoothPolygon(previous, next, alpha = 0.24) {
+  if (!previous?.length || !next?.length || previous.length !== next.length) return next;
+  return next.map((point, index) => ({
+    x: previous[index].x + (point.x - previous[index].x) * alpha,
+    y: previous[index].y + (point.y - previous[index].y) * alpha,
+  }));
+}
+
 function drawOverlay(canvas, analysis, finger, targets, activeTargetId) {
   const context = canvas.getContext("2d");
   const { width, height } = canvas;
@@ -97,7 +105,7 @@ function drawOverlay(canvas, analysis, finger, targets, activeTargetId) {
   }
 }
 
-function CameraView({ active, targets = [], activeTargetId, sensitivity, condition, onFrame, onReady, onError }) {
+function CameraView({ active, externalStream = null, highDetail = false, targets = [], activeTargetId, sensitivity, condition, onFrame, onReady, onError }) {
   const videoRef = useRef(null);
   const overlayRef = useRef(null);
   const analysisCanvasRef = useRef(document.createElement("canvas"));
@@ -108,9 +116,13 @@ function CameraView({ active, targets = [], activeTargetId, sensitivity, conditi
   const activeTargetRef = useRef(activeTargetId);
   const sensitivityRef = useRef(sensitivity);
   const conditionRef = useRef(condition);
+  const highDetailRef = useRef(highDetail);
   const [cameraReady, setCameraReady] = useState(false);
   const [modelReady, setModelReady] = useState(false);
-  const [facingMode, setFacingMode] = useState("user");
+  const [facingMode, setFacingMode] = useState(() => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ? "environment" : "user");
+  const [cameraResolution, setCameraResolution] = useState("");
+  const [zoomRange, setZoomRange] = useState(null);
+  const [zoom, setZoom] = useState(1);
 
   useEffect(() => { onFrameRef.current = onFrame; }, [onFrame]);
   useEffect(() => { onReadyRef.current = onReady; }, [onReady]);
@@ -119,6 +131,13 @@ function CameraView({ active, targets = [], activeTargetId, sensitivity, conditi
   useEffect(() => { activeTargetRef.current = activeTargetId; }, [activeTargetId]);
   useEffect(() => { sensitivityRef.current = sensitivity; }, [sensitivity]);
   useEffect(() => { conditionRef.current = condition; }, [condition]);
+  useEffect(() => { highDetailRef.current = highDetail; }, [highDetail]);
+
+  useEffect(() => {
+    const track = videoRef.current?.srcObject?.getVideoTracks?.()[0];
+    if (!track || !zoomRange) return;
+    track.applyConstraints({ advanced: [{ zoom }] }).catch(() => {});
+  }, [zoom, zoomRange]);
 
   useEffect(() => {
     if (!active) {
@@ -129,6 +148,7 @@ function CameraView({ active, targets = [], activeTargetId, sensitivity, conditi
 
     let cancelled = false;
     let stream;
+    let ownsStream = false;
     let handLandmarker;
     let poseLandmarker;
     let animationFrame;
@@ -136,6 +156,9 @@ function CameraView({ active, targets = [], activeTargetId, sensitivity, conditi
     let lastHandAt = 0;
     let lastPoseAt = 0;
     let poseConfirmationFrames = 0;
+    let lastReliablePoseAt = 0;
+    let stablePose = null;
+    let analysisId = 0;
     let latestPose = { personVisible: false, backFacing: false, polygon: null };
     let latestAnalysis = {
       backVisible: false,
@@ -150,14 +173,35 @@ function CameraView({ active, targets = [], activeTargetId, sensitivity, conditi
 
     async function initialize() {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } },
-          audio: false,
-        });
+        if (externalStream?.active && externalStream.getVideoTracks().length) {
+          stream = externalStream;
+        } else {
+          ownsStream = true;
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: { ideal: facingMode },
+              width: { ideal: 1920 },
+              height: { ideal: 1080 },
+            },
+            audio: false,
+          });
+        }
         if (cancelled) return;
         const video = videoRef.current;
         video.srcObject = stream;
         await video.play();
+        const track = stream.getVideoTracks()[0];
+        const settings = track?.getSettings?.() || {};
+        const capabilities = track?.getCapabilities?.() || {};
+        setCameraResolution(settings.width && settings.height ? `${settings.width}×${settings.height}` : "");
+        if (capabilities.zoom && Number.isFinite(capabilities.zoom.min) && Number.isFinite(capabilities.zoom.max)) {
+          const initialZoom = settings.zoom || capabilities.zoom.min || 1;
+          setZoom(initialZoom);
+          setZoomRange({ min: capabilities.zoom.min, max: capabilities.zoom.max, step: capabilities.zoom.step || 0.1 });
+        } else {
+          setZoomRange(null);
+          setZoom(1);
+        }
         setCameraReady(true);
 
         const vision = await FilesetResolver.forVisionTasks("/mediapipe");
@@ -183,18 +227,18 @@ function CameraView({ active, targets = [], activeTargetId, sensitivity, conditi
             baseOptions: { modelAssetPath: "/models/pose_landmarker_lite.task", delegate: "GPU" },
             runningMode: "VIDEO",
             numPoses: 1,
-            minPoseDetectionConfidence: 0.6,
-            minPosePresenceConfidence: 0.6,
-            minTrackingConfidence: 0.6,
+            minPoseDetectionConfidence: 0.5,
+            minPosePresenceConfidence: 0.48,
+            minTrackingConfidence: 0.48,
           });
         } catch {
           poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
             baseOptions: { modelAssetPath: "/models/pose_landmarker_lite.task", delegate: "CPU" },
             runningMode: "VIDEO",
             numPoses: 1,
-            minPoseDetectionConfidence: 0.6,
-            minPosePresenceConfidence: 0.6,
-            minTrackingConfidence: 0.6,
+            minPoseDetectionConfidence: 0.5,
+            minPosePresenceConfidence: 0.48,
+            minTrackingConfidence: 0.48,
           });
         }
         if (cancelled) return;
@@ -204,8 +248,8 @@ function CameraView({ active, targets = [], activeTargetId, sensitivity, conditi
       } catch (error) {
         if (!cancelled) {
           const message = error?.name === "NotAllowedError"
-            ? "Camera đang bị chặn. Hãy cấp quyền camera trong trình duyệt rồi thử lại."
-            : `Không thể khởi tạo camera/MediaPipe: ${error?.message || "Lỗi không xác định"}`;
+            ? "Camera access is blocked. Allow camera access in your browser and try again."
+            : `Unable to start the camera or MediaPipe: ${error?.message || "Unknown error"}`;
           onErrorRef.current?.(message);
         }
       }
@@ -224,24 +268,41 @@ function CameraView({ active, targets = [], activeTargetId, sensitivity, conditi
           try {
             const poseResult = poseLandmarker.detectForVideo(video, now);
             const pose = getPoseTorso(poseResult.landmarks?.[0]);
-            if (pose.backFacing) poseConfirmationFrames = Math.min(poseConfirmationFrames + 1, 6);
-            else poseConfirmationFrames = Math.max(poseConfirmationFrames - 2, 0);
-            latestPose = {
-              ...pose,
-              backFacing: pose.backFacing && poseConfirmationFrames >= 4,
-              polygon: pose.backFacing ? pose.polygon : null,
-            };
+            if (pose.backFacing && pose.polygon) {
+              poseConfirmationFrames = Math.min(poseConfirmationFrames + 1, 6);
+              const polygon = smoothPolygon(stablePose?.polygon, pose.polygon);
+              stablePose = { ...pose, polygon, held: false };
+              lastReliablePoseAt = now;
+              latestPose = {
+                ...stablePose,
+                backFacing: poseConfirmationFrames >= 3,
+              };
+            } else if (stablePose && now - lastReliablePoseAt <= 3800) {
+              poseConfirmationFrames = Math.max(poseConfirmationFrames - 0.2, 3);
+              latestPose = { ...stablePose, personVisible: true, backFacing: true, held: true };
+            } else {
+              poseConfirmationFrames = Math.max(poseConfirmationFrames - 1, 0);
+              latestPose = { ...pose, polygon: null };
+              stablePose = null;
+            }
           } catch {
-            poseConfirmationFrames = 0;
-            latestPose = { personVisible: false, backFacing: false, polygon: null };
+            if (stablePose && now - lastReliablePoseAt <= 3800) {
+              latestPose = { ...stablePose, personVisible: true, backFacing: true, held: true };
+            } else {
+              poseConfirmationFrames = 0;
+              stablePose = null;
+              latestPose = { personVisible: false, backFacing: false, polygon: null };
+            }
           }
           lastPoseAt = now;
         }
 
-        if (now - lastAnalysisAt > 300) {
+        const analysisInterval = highDetailRef.current ? 650 : 300;
+        if (now - lastAnalysisAt > analysisInterval) {
           const analysisCanvas = analysisCanvasRef.current;
-          analysisCanvas.width = 360;
-          analysisCanvas.height = Math.round(360 / aspect);
+          const maxAnalysisWidth = highDetailRef.current ? 1280 : 960;
+          analysisCanvas.width = Math.max(360, Math.min(video.videoWidth || 640, maxAnalysisWidth));
+          analysisCanvas.height = Math.round(analysisCanvas.width / aspect);
           const context = analysisCanvas.getContext("2d", { willReadFrequently: true });
           context.save();
           context.translate(analysisCanvas.width, 0);
@@ -257,6 +318,9 @@ function CameraView({ active, targets = [], activeTargetId, sensitivity, conditi
             latestPose,
             conditionRef.current,
           );
+          analysisId += 1;
+          latestAnalysis.analysisId = analysisId;
+          latestAnalysis.poseHeld = Boolean(latestPose.held);
           lastAnalysisAt = now;
         }
 
@@ -283,10 +347,12 @@ function CameraView({ active, targets = [], activeTargetId, sensitivity, conditi
       cancelAnimationFrame(animationFrame);
       handLandmarker?.close?.();
       poseLandmarker?.close?.();
-      stream?.getTracks().forEach((track) => track.stop());
+      if (ownsStream) stream?.getTracks().forEach((track) => track.stop());
       if (videoElement) videoElement.srcObject = null;
+      setCameraResolution("");
+      setZoomRange(null);
     };
-  }, [active, facingMode]);
+  }, [active, externalStream, facingMode]);
 
   return (
     <Card className="overflow-hidden border-0 bg-[#142723] shadow-[0_24px_70px_rgba(18,48,42,0.18)]">
@@ -297,24 +363,32 @@ function CameraView({ active, targets = [], activeTargetId, sensitivity, conditi
           <div className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(circle_at_center,#274a43_0,#142723_70%)]">
             <div className="text-center text-white">
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-white/10"><Camera size={30} /></div>
-              <p className="font-semibold">Camera chưa bật</p>
-              <p className="mt-1 text-xs text-white/55">Nhấn bắt đầu để cấp quyền</p>
+              <p className="font-semibold">Camera is off</p>
+              <p className="mt-1 text-xs text-white/55">Press Start to grant access</p>
             </div>
           </div>
         )}
         {active && !cameraReady && (
           <div className="absolute inset-0 flex items-center justify-center bg-[#142723] text-white">
-            <div className="text-center"><RefreshCw className="mx-auto animate-spin" size={28} /><p className="mt-3 text-sm">Đang mở camera...</p></div>
+            <div className="text-center"><RefreshCw className="mx-auto animate-spin" size={28} /><p className="mt-3 text-sm">Starting camera...</p></div>
           </div>
         )}
         <div className="absolute left-4 top-4 flex flex-wrap gap-2">
-          <span className={`rounded-full px-3 py-1.5 text-[11px] font-bold backdrop-blur ${cameraReady ? "bg-[#1d876f]/85 text-white" : "bg-black/35 text-white/60"}`}><CameraIcon className="mr-1 inline" size={12} /> Camera</span>
+          <span className={`rounded-full px-3 py-1.5 text-[11px] font-bold backdrop-blur ${cameraReady ? "bg-[#1d876f]/85 text-white" : "bg-black/35 text-white/60"}`}><CameraIcon className="mr-1 inline" size={12} /> {externalStream ? "Phone camera" : "Camera"}</span>
           <span className={`rounded-full px-3 py-1.5 text-[11px] font-bold backdrop-blur ${modelReady ? "bg-[#1d876f]/85 text-white" : "bg-black/35 text-white/60"}`}><Scan className="mr-1 inline" size={12} /> MediaPipe</span>
+          {cameraResolution && <span className="rounded-full bg-black/45 px-3 py-1.5 text-[11px] font-bold text-white/85 backdrop-blur">{cameraResolution}</span>}
+          {highDetail && <span className="rounded-full bg-[#7657c8]/85 px-3 py-1.5 text-[11px] font-bold text-white backdrop-blur">High-detail scan</span>}
         </div>
-        {active && cameraReady && (
-          <button type="button" onClick={() => setFacingMode((mode) => mode === "user" ? "environment" : "user")} className="absolute right-4 top-4 rounded-full bg-black/40 p-2.5 text-white backdrop-blur hover:bg-black/55" aria-label="Đổi camera"><RefreshCw size={17} /></button>
+        {active && cameraReady && !externalStream && (
+          <button type="button" onClick={() => setFacingMode((mode) => mode === "user" ? "environment" : "user")} className="absolute right-4 top-4 rounded-full bg-black/40 p-2.5 text-white backdrop-blur hover:bg-black/55" aria-label="Switch camera"><RefreshCw size={17} /></button>
         )}
-        <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full bg-black/45 px-4 py-2 text-[11px] font-medium text-white backdrop-blur"><ShieldCheck size={14} className="text-[#79e0c1]" /> Xử lý cục bộ · không lưu video</div>
+        {active && cameraReady && zoomRange && (
+          <label className="absolute bottom-14 right-4 flex items-center gap-2 rounded-full bg-black/45 px-3 py-2 text-[10px] font-bold text-white backdrop-blur">
+            Zoom {zoom.toFixed(1)}×
+            <input type="range" min={zoomRange.min} max={zoomRange.max} step={zoomRange.step} value={zoom} onChange={(event) => setZoom(Number(event.target.value))} className="w-24 accent-[#65e6c2]" />
+          </label>
+        )}
+        <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full bg-black/45 px-4 py-2 text-[11px] font-medium text-white backdrop-blur"><ShieldCheck size={14} className="text-[#79e0c1]" /> {externalStream ? "Encrypted WebRTC · video is not saved" : "On-device processing · video is not saved"}</div>
       </div>
     </Card>
   );

@@ -6,20 +6,20 @@ function DiseaseSelector({ selected, setSelected }) {
   const diseases = [
     {
       id: "pityriasis",
-      name: "Lang ben",
-      description: "Hỗ trợ theo dõi các vùng da cần chăm sóc",
+      name: "Pityriasis versicolor",
+      description: "Track possible pale areas that may need treatment",
       icon: "●",
     },
     {
       id: "ringworm",
-      name: "Hắc lào",
-      description: "Theo dõi và nhắc nhở quá trình điều trị",
+      name: "Ringworm",
+      description: "Track treatment areas and medication progress",
       icon: "○",
     },
     {
       id: "acne",
-      name: "Mụn lưng",
-      description: "Hỗ trợ phủ thuốc lên từng vùng mụn theo chỉ định",
+      name: "Back acne",
+      description: "Guide coverage across prescribed acne treatment areas",
       icon: "✦",
     },
   ];
@@ -27,7 +27,7 @@ function DiseaseSelector({ selected, setSelected }) {
   return (
     <div className="min-w-0">
       <h2 className="mb-4 break-words text-xl font-bold text-[#193B35]">
-        Bạn đang điều trị vấn đề nào?
+        Which condition are you treating?
       </h2>
 
       <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-3">

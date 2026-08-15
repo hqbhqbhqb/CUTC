@@ -4,22 +4,24 @@ import { ArrowLeft, LockKeyhole, Scale } from "lucide-react";
 const copy = {
   terms: {
     eyebrow: "TERMS & CONDITIONS",
-    title: "Điều khoản sử dụng",
+    title: "Terms of Use",
     icon: Scale,
     sections: [
-      ["Mục đích", "DermaCare là công cụ hỗ trợ nhắc lịch và hướng dẫn vị trí bôi thuốc. Ứng dụng không chẩn đoán bệnh và không thay thế bác sĩ."],
-      ["Sử dụng an toàn", "Chỉ dùng thuốc theo chỉ định của bác sĩ. Dừng sử dụng và liên hệ cơ sở y tế nếu có kích ứng, đau, khó chịu hoặc triệu chứng bất thường."],
-      ["Giới hạn bản demo", "Nhận diện vùng da sáng dựa trên hình ảnh camera có thể sai do ánh sáng, màu da, chất lượng camera hoặc bệnh lý khác. Người dùng phải kiểm tra lại trước khi bôi."],
+      ["Purpose", "DermaCare provides medication reminders and application guidance. It does not diagnose disease or replace a healthcare professional."],
+      ["Safe use", "Only use medication as prescribed. Stop and contact a healthcare professional if irritation, pain, discomfort, or unusual symptoms occur."],
+      ["MVP limitations", "Camera-based highlighting may be wrong because of lighting, skin tone, camera quality, scars, or other conditions. Always verify an area before applying medication."],
     ],
   },
   privacy: {
     eyebrow: "PRIVACY POLICY",
-    title: "Chính sách quyền riêng tư",
+    title: "Privacy Policy",
     icon: LockKeyhole,
     sections: [
-      ["Xử lý tại thiết bị", "Trong bản MVP này, khung hình camera được xử lý trực tiếp trong trình duyệt và không được tải lên máy chủ."],
-      ["Dữ liệu tài khoản", "Hồ sơ, lịch thuốc và tiến độ được lưu trong localStorage của chính trình duyệt. Xóa dữ liệu trình duyệt sẽ xóa dữ liệu bản demo."],
-      ["Khi triển khai thật", "Phiên bản sản xuất cần backend đạt chuẩn bảo mật, mã hóa, kiểm soát truy cập, nhật ký đồng ý và quy trình bảo vệ dữ liệu y tế phù hợp pháp luật."],
+      ["Camera processing", "Camera frames are processed by the desktop browser and are not saved. When phone pairing is used, the live video is encrypted in transit through WebRTC and PeerJS provides connection signaling metadata."],
+      ["Account data", "Profiles, medication schedules, and progress are stored in this browser's localStorage. Clearing browser data removes the demo data."],
+      ["Email reminders", "Email reminders are opt-in and require verification of the registered address. When enabled, the verified email, generic reminder content, and delivery times are processed by Resend. Medication names are omitted unless the user explicitly enables them."],
+      ["Third-party services", "PeerJS Cloud is used only to exchange WebRTC connection metadata. Resend and Vercel process email delivery and server requests when those features are enabled. Camera frames are not intentionally stored by DermaCare."],
+      ["Production requirements", "This prototype still needs formal clinical validation, a production identity system, access controls, consent records, and legally compliant health-data safeguards before clinical use."],
     ],
   },
 };
@@ -30,7 +32,7 @@ function Legal({ type }) {
   return (
     <main className="mx-auto min-h-[70vh] max-w-3xl px-5 py-12 lg:px-8">
       <Link to="/register" className="inline-flex items-center gap-2 text-sm font-semibold text-[#247568]">
-        <ArrowLeft size={17} /> Quay lại đăng ký
+        <ArrowLeft size={17} /> Back to registration
       </Link>
       <div className="mt-7 rounded-[28px] border border-[#dbe9e5] bg-white p-7 shadow-sm sm:p-10">
         <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#e7f4f0] text-[#247568]">

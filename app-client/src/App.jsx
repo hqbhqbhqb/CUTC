@@ -1,16 +1,30 @@
-import { Routes, Route } from "react-router-dom";
+import { lazy, Suspense } from "react";
+import { Routes, Route, useLocation } from "react-router-dom";
 
 import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
 
 import Home from "./pages/Home";
 import Profile from "./pages/Profile";
-import AIAssistant from "./pages/AIAssistant";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Legal from "./pages/Legal";
 
+const AIAssistant = lazy(() => import("./pages/AIAssistant"));
+const PhoneCamera = lazy(() => import("./pages/PhoneCamera"));
+
+function LoadingPage() {
+  return <div className="flex min-h-[55vh] items-center justify-center text-sm font-semibold text-[#5f7772]">Loading DermaCare...</div>;
+}
+
 function App() {
+  const location = useLocation();
+  const phoneCameraMode = location.pathname === "/phone-camera";
+
+  if (phoneCameraMode) {
+    return <Suspense fallback={<LoadingPage />}><Routes><Route path="/phone-camera" element={<PhoneCamera />} /></Routes></Suspense>;
+  }
+
   return (
     <div className="flex min-h-screen flex-col">
       {/* Fixed navbar */}
@@ -18,7 +32,7 @@ function App() {
 
       {/* Page content */}
       <main className="flex-1 pt-[73px]">
-        <Routes>
+        <Suspense fallback={<LoadingPage />}><Routes>
           <Route path="/" element={<Home />} />
 
           <Route path="/profile" element={<Profile />} />
@@ -30,7 +44,8 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/terms" element={<Legal type="terms" />} />
           <Route path="/privacy" element={<Legal type="privacy" />} />
-        </Routes>
+          <Route path="/phone-camera" element={<PhoneCamera />} />
+        </Routes></Suspense>
       </main>
 
       {/* Footer */}

@@ -1,23 +1,29 @@
 # DermaCare Vision
 
-MVP web hỗ trợ người dùng tự bôi thuốc ở vùng lưng bằng camera. Ứng dụng dùng MediaPipe Hand Landmarker để theo dõi đầu ngón trỏ, phân tích chênh lệch màu ngay trong trình duyệt để gợi ý vùng da sáng, phát hướng dẫn bằng Web Speech API và ghi nhận tiến độ dùng thuốc.
+DermaCare is a camera-guided web MVP that helps a user apply prescribed medication to hard-to-see areas of the back. It uses MediaPipe to confirm a back-facing pose and track the index fingertip, local contrast analysis to highlight possible treatment areas, Web Speech for voice guidance, and a coverage map to track application progress.
 
-> Đây là công cụ hỗ trợ thao tác, không phải thiết bị y tế và không dùng để chẩn đoán lang ben/hắc lào. Việc dùng thuốc phải theo chỉ định của bác sĩ.
+> DermaCare is an assistive prototype, not a medical device. It does not diagnose pityriasis versicolor, ringworm, acne, or any other condition. Medication must only be used as prescribed by a healthcare professional.
 
-## Chức năng
+## Features
 
-- Đăng ký/đăng nhập cục bộ, điều khoản và chính sách quyền riêng tư.
-- Lưu nhiều thuốc bôi/uống, số lần và nhiều khung giờ mỗi ngày.
-- Task schedule, chỉnh giờ, đánh dấu hoàn thành và contribution chart 30 ngày.
-- Camera chạy MediaPipe Pose + Hand Landmarker trên thiết bị, không upload hay lưu khung hình.
-- Chỉ quét sau khi thấy đủ vai–hông và xác nhận người đang quay lưng; đèn/nền sáng không được tạo target nếu thiếu pose hợp lệ.
-- Hỗ trợ phác đồ lang ben, hắc lào và mụn lưng; xử lý nửa lưng trái trước rồi nửa phải.
-- Hướng dẫn ngón trỏ bằng tiếng Việt, kêu “tít” trong vùng target.
-- Hiển thị bản đồ phủ theo hình dạng vùng; chỉ hoàn thành khi phủ ít nhất 90%, tiếp xúc đủ 3 giây và có chuyển động xoa.
+- Local demo registration and sign-in, Terms & Conditions, and Privacy Policy.
+- Multiple topical and oral medications with one or more daily times.
+- Editable task schedule, completion tracking, and a 30-day contribution chart.
+- On-device MediaPipe Pose and Hand Landmarker processing; camera frames are not uploaded or stored.
+- A contracted torso ROI plus skin validation prevents bright lamps or walls beside the body from becoming targets.
+- Pose smoothing and a short occlusion hold keep the back map stable when an arm moves behind the body.
+- Pityriasis versicolor, ringworm, and back-acne modes.
+- English Web Speech guidance. Direction words repeat every 800 ms; status messages are allowed to finish.
+- Shape-aware coverage: at least 90% area coverage, three seconds of contact, and rubbing motion are required.
+- Up to 1080p camera capture, a high-detail scan pass, automatic rear-camera selection on phones, and hardware zoom when supported.
+- Desktop-to-phone QR pairing: a fixed phone rear camera publishes an encrypted WebRTC stream and the desktop runs the existing MediaPipe/vision pipeline.
+- Phone-side 4K/1080p requests, camera zoom and torch controls when the browser exposes them, plus an adaptive white desktop illumination screen.
+- Device notifications for medication times while the app remains open, including in a background tab.
+- Opt-in email reminders with address verification, privacy-safe generic content, scheduled delivery, cancellation, and automatic renewal while the user revisits Profile.
 
-## Chạy local
+## Run locally
 
-Yêu cầu Node.js 20+ (khuyến nghị Node.js 22 hoặc 24).
+Node.js 20+ is required. Node.js 22 or 24 is recommended.
 
 ```bash
 cd app-client
@@ -25,37 +31,54 @@ npm install
 npm run dev
 ```
 
-Mở [http://localhost:5173](http://localhost:5173). Có thể dùng pnpm tương đương:
+Open [http://localhost:5173](http://localhost:5173).
 
-```bash
-pnpm install
-pnpm dev
-```
+## Quick test
 
-## Test nhanh
+1. Create a demo account and accept the legal terms.
+2. Select a condition and add at least one topical medication.
+3. Open **AI Assistant**, select **Start camera and voice**, and allow camera access.
+4. Keep the complete back inside the dashed polygon with soft, even lighting.
+5. Point with the index finger and fold the other fingers. Follow the English directions.
+6. When the beeping begins, stay close to the highlighted cells and rub gently for three to four seconds.
+7. Open **Profile → Medication reminders** to enable device notifications.
 
-1. Đăng ký một tài khoản demo và đồng ý điều khoản.
-2. Ở trang chủ, chọn bệnh và thêm ít nhất một thuốc bôi; chọn số lần/ngày để nhập từng khung giờ.
-3. Nhấn **Xong** để xem task hôm nay, hoặc mở **Profile** để chỉnh giờ và đánh dấu tiến độ.
-4. Mở **AI Assistant** → **Bắt đầu và bật giọng nói** → cho phép camera.
-5. Đặt camera/laptop sao cho toàn bộ lưng nằm trong đường nét đứt, ánh sáng đều và nền khác màu da.
-6. Dùng ngón trỏ, cụp các ngón còn lại. Làm theo hướng dẫn; khi nghe tiếng tít, giữ sát target và xoa nhẹ 3–4 giây.
+To use the phone rear camera, select **Phone rear** in AI Assistant, scan the QR code, open the link on the phone, and select **Connect rear camera**. Keep the phone fixed after the scan starts.
 
-Camera chỉ hoạt động trong secure context: `localhost` khi phát triển hoặc website deploy bằng HTTPS. Nếu vùng sáng bị nhận sai, chỉnh thanh **Độ nhạy vùng sáng**.
+Camera access requires a secure context: `localhost` during development or an HTTPS deployment.
 
-## Kiểm tra trước khi deploy
+## Validation
 
 ```bash
 npm run lint
+npm run test:email
 npm run test:vision
 npm run build
 npm run preview
 ```
 
-Model MediaPipe và WebAssembly đã nằm trong `public/models` và `public/mediapipe`, nên không cần tải model từ CDN khi đang sử dụng.
+MediaPipe models and WebAssembly assets are stored in `public/models` and `public/mediapipe`, so the models are not fetched from a third-party CDN during use.
 
-## Giới hạn MVP
+## Email deployment setup
 
-- Auth và dữ liệu đang lưu trong `localStorage`; chưa phù hợp môi trường production hoặc dữ liệu y tế thật.
-- Phát hiện vùng da sáng là heuristic màu, có thể nhầm ánh sáng phản chiếu, sẹo hoặc tình trạng da khác.
-- Trước khi triển khai thực tế cần backend có mã hóa, phân quyền, đồng ý xử lý dữ liệu, đánh giá lâm sàng và kiểm thử trên nhiều màu da/điều kiện sáng.
+The email API is deployed as `api/email-reminders.js`. Set these server-only Vercel environment variables:
+
+- `RESEND_API_KEY` (required)
+- `REMINDER_FROM`, for example `DermaCare <reminders@your-domain.com>` (recommended)
+- `EMAIL_TOKEN_SECRET` (optional; a key-derived signing secret is used when omitted)
+- `EMAIL_SCHEDULE_DAYS` from 1–30 (optional; default 14)
+
+Resend requires a verified sender domain for arbitrary recipients. After changing environment variables, redeploy production. The browser never receives the API key.
+
+## Phone camera
+
+The implemented QR workflow uses an ephemeral PeerJS signaling room and peer-to-peer WebRTC video. See [docs/PHONE_CAMERA_AND_REMINDERS.md](docs/PHONE_CAMERA_AND_REMINDERS.md) for usage, privacy, and connectivity constraints.
+
+## MVP limitations
+
+- Authentication and health-related schedule data are still stored in `localStorage`; this is not suitable for production health data.
+- Highlighting is a color/local-contrast heuristic and can still confuse glare, scars, uneven lighting, or another skin condition.
+- Reliable device notifications after the browser closes still require Web Push and a durable backend.
+- Email delivery requires a Resend API key and verified sender domain. Without them, the Profile page reports the feature as unavailable instead of exposing a client-side mail secret.
+- The default PeerJS Cloud connection can fail on networks that block direct WebRTC. A clinical production release should operate a private signaling service and managed TURN fallback.
+- Production use requires clinical validation on labeled data across skin tones, lighting conditions, cameras, and confirmed diagnoses.
