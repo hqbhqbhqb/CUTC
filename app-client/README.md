@@ -61,14 +61,14 @@ MediaPipe models and WebAssembly assets are stored in `public/models` and `publi
 
 ## Email deployment setup
 
-The email API is deployed as `api/email-reminders.js`. Set these server-only Vercel environment variables:
+The email API is deployed as `api/email-reminders.js` and uses Brevo's Transactional Email API. Set these server-only Vercel environment variables:
 
-- `RESEND_API_KEY` (required)
-- `REMINDER_FROM`, for example `DermaCare <reminders@your-domain.com>` (recommended)
+- `BREVO_API_KEY` (required; use an API key, not an SMTP key)
+- `BREVO_SENDER_EMAIL`, for example `contact.dermacareskin@gmail.com` (required and verified in Brevo)
+- `BREVO_SENDER_NAME`, for example `DermaCare` (optional; default `DermaCare`)
 - `EMAIL_TOKEN_SECRET` (optional; a key-derived signing secret is used when omitted)
-- `EMAIL_SCHEDULE_DAYS` from 1–30 (optional; default 14)
 
-Resend requires a verified sender domain for arbitrary recipients. After changing environment variables, redeploy production. The browser never receives the API key.
+Brevo permits an individually verified Gmail sender, so a custom domain is not required for this MVP. Brevo only accepts transactional scheduling up to 72 hours ahead; DermaCare therefore keeps a rolling 72-hour window and renews it when the user revisits Profile. After changing environment variables, redeploy production. The browser never receives the API key.
 
 ## Phone camera
 
@@ -79,6 +79,6 @@ The implemented QR workflow uses an ephemeral PeerJS signaling room and peer-to-
 - Authentication and health-related schedule data are still stored in `localStorage`; this is not suitable for production health data.
 - Highlighting is a color/local-contrast heuristic and can still confuse glare, scars, uneven lighting, or another skin condition.
 - Reliable device notifications after the browser closes still require Web Push and a durable backend.
-- Email delivery requires a Resend API key and verified sender domain. Without them, the Profile page reports the feature as unavailable instead of exposing a client-side mail secret.
+- Email delivery requires a Brevo API key and a verified sender email. Without them, the Profile page reports the feature as unavailable instead of exposing a client-side mail secret.
 - The default PeerJS Cloud connection can fail on networks that block direct WebRTC. A clinical production release should operate a private signaling service and managed TURN fallback.
 - Production use requires clinical validation on labeled data across skin tones, lighting conditions, cameras, and confirmed diagnoses.

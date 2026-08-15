@@ -2,7 +2,8 @@ import crypto from "node:crypto";
 
 export const maxDuration = 60;
 
-const resendEndpoint = "https://api.resend.com";
+const brevoEndpoint = "https://api.brevo.com/v3";
+const scheduleWindowHours = 71;
 const warmRateLimits = new Map();
 
 function sendJson(response, status, body) {
@@ -11,11 +12,11 @@ function sendJson(response, status, body) {
 }
 
 function configured() {
-  return Boolean(process.env.RESEND_API_KEY);
+  return Boolean(process.env.BREVO_API_KEY && process.env.BREVO_SENDER_EMAIL);
 }
 
 function signingSecret() {
-  const source = process.env.EMAIL_TOKEN_SECRET || `${process.env.RESEND_API_KEY}|dermacare-email-reminders-v1`;
+  const source = process.env.EMAIL_TOKEN_SECRET || `${process.env.BREVO_API_KEY}|dermacare-email-reminders-v2`;
   return crypto.createHash("sha256").update(source).digest();
 }
 
@@ -91,11 +92,19 @@ function escapeHtml(value) {
   })[character]);
 }
 
-async function resend(path, options = {}, retry = true) {
-  const response = await fetch(`${resendEndpoint}${path}`, {
+function sender() {
+  return {
+    name: String(process.env.BREVO_SENDER_NAME || "DermaCare").trim().slice(0, 70),
+    email: String(process.env.BREVO_SENDER_EMAIL || "").trim().toLowerCase(),
+  };
+}
+
+async function brevo(path, options = {}, retry = true) {
+  const response = await fetch(`${brevoEndpoint}${path}`, {
     ...options,
     headers: {
-      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      "api-key": process.env.BREVO_API_KEY,
+      Accept: "application/json",
       "Content-Type": "application/json",
       "User-Agent": "DermaCare-Reminders/1.0",
       ...(options.headers || {}),
@@ -105,7 +114,7 @@ async function resend(path, options = {}, retry = true) {
   if (response.status === 429 && retry) {
     const retryAfter = Math.min(Number(response.headers.get("retry-after")) || 1, 2);
     await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000));
-    return resend(path, options, false);
+    return brevo(path, options, false);
   }
   if (!response.ok) {
     const error = new Error(result?.message || result?.error?.message || "The email provider rejected the request.");
@@ -131,11 +140,12 @@ function normalizeReminders(items) {
   return [...grouped.values()].sort((a, b) => a.time.localeCompare(b.time)).slice(0, 6);
 }
 
-function scheduledOccurrences(reminders, timezoneOffset, days) {
+function scheduledOccurrences(reminders, timezoneOffset) {
   const offset = Math.max(-840, Math.min(840, Number(timezoneOffset) || 0));
   const localNow = new Date(Date.now() - offset * 60_000);
+  const latestTimestamp = Date.now() + scheduleWindowHours * 60 * 60_000;
   const occurrences = [];
-  for (let dayIndex = 0; dayIndex < days; dayIndex += 1) {
+  for (let dayIndex = 0; dayIndex < 4; dayIndex += 1) {
     const localDate = new Date(Date.UTC(localNow.getUTCFullYear(), localNow.getUTCMonth(), localNow.getUTCDate() + dayIndex));
     reminders.forEach((reminder) => {
       const [hours, minutes] = reminder.time.split(":").map(Number);
@@ -146,7 +156,7 @@ function scheduledOccurrences(reminders, timezoneOffset, days) {
         hours,
         minutes,
       ) + offset * 60_000;
-      if (timestamp > Date.now() + 120_000) occurrences.push({ ...reminder, timestamp });
+      if (timestamp > Date.now() + 120_000 && timestamp <= latestTimestamp) occurrences.push({ ...reminder, timestamp });
     });
   }
   return occurrences;
@@ -181,16 +191,15 @@ async function requestVerification(request, response, body) {
   const token = encodeToken({ kind: "verify", email, nonce: crypto.randomUUID(), exp: Date.now() + 30 * 60_000 });
   const origin = String(request.headers.origin);
   const verificationUrl = `${origin}/profile?emailVerification=${encodeURIComponent(token)}`;
-  const from = process.env.REMINDER_FROM || "DermaCare <onboarding@resend.dev>";
-  await resend("/emails", {
+  await brevo("/smtp/email", {
     method: "POST",
-    headers: { "Idempotency-Key": `verify-${crypto.createHash("sha256").update(token).digest("hex").slice(0, 40)}` },
     body: JSON.stringify({
-      from,
-      to: [email],
+      sender: sender(),
+      to: [{ email }],
       subject: "Confirm DermaCare email reminders",
-      text: `Confirm email reminders: ${verificationUrl}\n\nThis link expires in 30 minutes. If you did not request it, ignore this email.`,
-      html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#193b35"><h1 style="font-size:24px">Confirm medication reminders</h1><p style="line-height:1.6">Use the button below to confirm that DermaCare may send schedule reminders to this address.</p><p><a href="${escapeHtml(verificationUrl)}" style="display:inline-block;background:#2d7a6d;color:#fff;text-decoration:none;padding:13px 20px;border-radius:10px;font-weight:bold">Confirm email reminders</a></p><p style="font-size:12px;color:#71827e">The link expires in 30 minutes. If you did not request this, ignore the email.</p></div>`,
+      textContent: `Confirm email reminders: ${verificationUrl}\n\nThis link expires in 30 minutes. If you did not request it, ignore this email.`,
+      htmlContent: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#193b35"><h1 style="font-size:24px">Confirm medication reminders</h1><p style="line-height:1.6">Use the button below to confirm that DermaCare may send schedule reminders to this address.</p><p><a href="${escapeHtml(verificationUrl)}" style="display:inline-block;background:#2d7a6d;color:#fff;text-decoration:none;padding:13px 20px;border-radius:10px;font-weight:bold">Confirm email reminders</a></p><p style="font-size:12px;color:#71827e">The link expires in 30 minutes. If you did not request this, ignore the email.</p></div>`,
+      tags: ["email_verification"],
     }),
   });
   sendJson(response, 200, { ok: true });
@@ -211,36 +220,29 @@ async function scheduleReminders(request, response, body) {
     sendJson(response, 400, { error: "Add at least one medication time before enabling email reminders." });
     return;
   }
-  const days = Math.max(1, Math.min(30, Number(process.env.EMAIL_SCHEDULE_DAYS) || 14));
-  const occurrences = scheduledOccurrences(reminders, body.timezoneOffset, days);
-  const from = process.env.REMINDER_FROM || "DermaCare <onboarding@resend.dev>";
+  const occurrences = scheduledOccurrences(reminders, body.timezoneOffset);
   const ids = [];
   try {
     for (const occurrence of occurrences) {
       const content = reminderContent(occurrence, Boolean(body.includeDetails));
-      const unique = crypto.createHash("sha256")
-        .update(`${authorization.nonce || authorization.email}|${occurrence.timestamp}|${occurrence.time}`)
-        .digest("hex")
-        .slice(0, 48);
-      const result = await resend("/emails", {
+      const result = await brevo("/smtp/email", {
         method: "POST",
-        headers: { "Idempotency-Key": `reminder-${unique}` },
         body: JSON.stringify({
-          from,
-          to: [authorization.email],
+          sender: sender(),
+          to: [{ email: authorization.email }],
           subject: content.subject,
-          text: content.text,
-          html: content.html,
-          scheduled_at: new Date(occurrence.timestamp).toISOString(),
-          tags: [{ name: "type", value: "medication_reminder" }],
+          textContent: content.text,
+          htmlContent: content.html,
+          scheduledAt: new Date(occurrence.timestamp).toISOString(),
+          tags: ["medication_reminder"],
         }),
       });
-      if (result.id) ids.push(result.id);
+      if (result.messageId) ids.push(result.messageId);
       await new Promise((resolve) => setTimeout(resolve, 210));
     }
   } catch (error) {
     for (const id of ids) {
-      await resend(`/emails/${id}/cancel`, { method: "POST" }, false).catch(() => {});
+      await brevo(`/smtp/email/${encodeURIComponent(id)}`, { method: "DELETE" }, false).catch(() => {});
       await new Promise((resolve) => setTimeout(resolve, 210));
     }
     throw error;
@@ -249,6 +251,7 @@ async function scheduleReminders(request, response, body) {
     kind: "manage",
     email: authorization.email,
     nonce: authorization.nonce || crypto.randomUUID(),
+    provider: "brevo",
     exp: Date.now() + 45 * 24 * 60 * 60_000,
   });
   const scheduledUntil = occurrences.length ? new Date(Math.max(...occurrences.map((item) => item.timestamp))).toISOString() : null;
@@ -270,15 +273,18 @@ async function cancelReminders(request, response, body) {
     return;
   }
   const ids = (Array.isArray(body.ids) ? body.ids : [])
-    .filter((id) => /^[0-9a-f-]{36}$/i.test(String(id)))
+    .map((id) => String(id))
+    .filter((id) => id.length > 0 && id.length <= 300 && /^[A-Za-z0-9@._+<>:=,-]+$/.test(id))
     .slice(0, 200);
   let cancelled = 0;
   for (const id of ids) {
     try {
-      await resend(`/emails/${id}/cancel`, { method: "POST" });
+      await brevo(`/smtp/email/${encodeURIComponent(id)}`, { method: "DELETE" });
       cancelled += 1;
     } catch (error) {
-      if (error.status !== 404) throw error;
+      // Brevo returns 400/404 when a previously stored message has already been sent
+      // or is no longer present in the scheduled queue.
+      if (error.status !== 400 && error.status !== 404) throw error;
     }
     await new Promise((resolve) => setTimeout(resolve, 210));
   }
@@ -287,8 +293,7 @@ async function cancelReminders(request, response, body) {
 
 export default async function handler(request, response) {
   if (request.method === "GET") {
-    const days = Math.max(1, Math.min(30, Number(process.env.EMAIL_SCHEDULE_DAYS) || 14));
-    sendJson(response, 200, { configured: configured(), scheduleDays: days });
+    sendJson(response, 200, { configured: configured(), provider: "brevo", scheduleHours: 72, scheduleDays: 3 });
     return;
   }
   if (request.method !== "POST") {
@@ -312,7 +317,7 @@ export default async function handler(request, response) {
     else if (body.action === "cancel") await cancelReminders(request, response, body);
     else sendJson(response, 400, { error: "Unknown email reminder action." });
   } catch (error) {
-    const publicMessage = error.status === 403
+    const publicMessage = error.status === 401 || error.status === 403
       ? "The sender domain or email provider credentials are not valid. Check the Vercel email settings."
       : error.status === 429
         ? "The email provider rate limit was reached. Wait a minute and retry."

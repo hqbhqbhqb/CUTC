@@ -1,16 +1,18 @@
 import assert from "node:assert/strict";
 
-process.env.RESEND_API_KEY = "re_test_key";
+process.env.BREVO_API_KEY = "xkeysib-test-key";
+process.env.BREVO_SENDER_EMAIL = "contact.dermacareskin@gmail.com";
+process.env.BREVO_SENDER_NAME = "DermaCare";
 process.env.EMAIL_TOKEN_SECRET = "test-only-secret";
-process.env.EMAIL_SCHEDULE_DAYS = "1";
 
 const providerRequests = [];
 let emailSequence = 0;
 globalThis.fetch = async (url, options = {}) => {
   providerRequests.push({ url: String(url), options });
+  if (options.method === "DELETE") return new Response(null, { status: 204 });
   emailSequence += 1;
-  return new Response(JSON.stringify({ id: `00000000-0000-4000-8000-${String(emailSequence).padStart(12, "0")}` }), {
-    status: 200,
+  return new Response(JSON.stringify({ messageId: `<test-${emailSequence}@relay.brevo.test>` }), {
+    status: 201,
     headers: { "Content-Type": "application/json" },
   });
 };
@@ -40,6 +42,8 @@ function invoke(method, body = null) {
 const status = await invoke("GET");
 assert.equal(status.statusCode, 200);
 assert.equal(status.body.configured, true);
+assert.equal(status.body.provider, "brevo");
+assert.equal(status.body.scheduleHours, 72);
 
 const verification = await invoke("POST", {
   action: "request-verification",
@@ -48,7 +52,8 @@ const verification = await invoke("POST", {
 });
 assert.equal(verification.statusCode, 200);
 const verificationPayload = JSON.parse(providerRequests[0].options.body);
-const tokenMatch = verificationPayload.html.match(/emailVerification=([^"&]+)/);
+assert.equal(verificationPayload.sender.email, "contact.dermacareskin@gmail.com");
+const tokenMatch = verificationPayload.htmlContent.match(/emailVerification=([^"&]+)/);
 assert.ok(tokenMatch, "verification token should be embedded in the email link");
 const token = decodeURIComponent(tokenMatch[1]);
 
@@ -66,8 +71,8 @@ assert.equal(scheduled.body.email, "person@example.com");
 assert.ok(scheduled.body.ids.length >= 1);
 assert.ok(scheduled.body.managementToken);
 const scheduledPayload = JSON.parse(providerRequests[1].options.body);
-assert.ok(scheduledPayload.scheduled_at);
-assert.equal(scheduledPayload.text.includes("Example cream"), false, "private mode must omit medication names");
+assert.ok(scheduledPayload.scheduledAt);
+assert.equal(scheduledPayload.textContent.includes("Example cream"), false, "private mode must omit medication names");
 
 const cancelled = await invoke("POST", {
   action: "cancel",

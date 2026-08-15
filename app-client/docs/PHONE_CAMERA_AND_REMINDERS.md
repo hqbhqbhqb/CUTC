@@ -17,20 +17,21 @@ PeerJS Cloud exchanges connection metadata; it does not intentionally relay or s
 
 ## Implemented email workflow
 
-1. Profile checks whether the Vercel email API has a server-side `RESEND_API_KEY`.
+1. Profile checks whether the Vercel email API has a server-side `BREVO_API_KEY` and `BREVO_SENDER_EMAIL`.
 2. The user requests a verification email at the address registered in the browser.
 3. The API sends a signed 30-minute confirmation link. The signing key never reaches the browser.
-4. Opening the link schedules reminders for the next 14 days by default. Up to six unique medication times per day are grouped to reduce duplicate messages.
+4. Opening the link schedules reminders in Brevo's rolling 72-hour window. Up to six unique medication times per day are grouped to reduce duplicate messages.
 5. Email content is generic by default. Medication names are included only when explicitly selected.
 6. The browser stores opaque scheduled-email IDs and a signed management token so the user can cancel or refresh pending reminders.
-7. When Profile is reopened within three days of expiry and the schedule is unchanged, reminders renew automatically.
+7. When Profile is reopened within 24 hours of expiry and the schedule is unchanged, reminders renew automatically.
 
-The API validates same-origin writes, email addresses, signed tokens, payload sizes, medication times, and includes warm-instance request throttling. Resend idempotency keys reduce duplicates. Pending emails are cancelled if a partial scheduling operation fails.
+The API validates same-origin writes, email addresses, signed tokens, payload sizes, medication times, and includes warm-instance request throttling. Pending Brevo emails are cancelled if a partial scheduling operation fails.
 
 Required production environment:
 
-- `RESEND_API_KEY`
-- a sender domain verified in Resend
-- `REMINDER_FROM`, such as `DermaCare <reminders@example.com>`
+- `BREVO_API_KEY` (API key, not SMTP key)
+- `BREVO_SENDER_EMAIL`, verified as a sender in Brevo
+- `BREVO_SENDER_NAME`, such as `DermaCare`
+- `EMAIL_TOKEN_SECRET` (recommended as a separate random secret)
 
 This zero-database design deliberately schedules a limited rolling window. Indefinite recurring delivery, account recovery, cross-device cancellation, stronger global rate limiting, and Web Push after the browser closes require durable backend storage and production authentication.

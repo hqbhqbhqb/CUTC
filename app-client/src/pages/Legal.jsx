@@ -19,8 +19,8 @@ const copy = {
     sections: [
       ["Camera processing", "Camera frames are processed by the desktop browser and are not saved. When phone pairing is used, the live video is encrypted in transit through WebRTC and PeerJS provides connection signaling metadata."],
       ["Account data", "Profiles, medication schedules, and progress are stored in this browser's localStorage. Clearing browser data removes the demo data."],
-      ["Email reminders", "Email reminders are opt-in and require verification of the registered address. When enabled, the verified email, generic reminder content, and delivery times are processed by Resend. Medication names are omitted unless the user explicitly enables them."],
-      ["Third-party services", "PeerJS Cloud is used only to exchange WebRTC connection metadata. Resend and Vercel process email delivery and server requests when those features are enabled. Camera frames are not intentionally stored by DermaCare."],
+      ["Email reminders", "Email reminders are opt-in and require verification of the registered address. When enabled, the verified email, generic reminder content, and delivery times are processed by Brevo. Medication names are omitted unless the user explicitly enables them."],
+      ["Third-party services", "PeerJS Cloud is used only to exchange WebRTC connection metadata. Brevo and Vercel process email delivery and server requests when those features are enabled. Camera frames are not intentionally stored by DermaCare."],
       ["Production requirements", "This prototype still needs formal clinical validation, a production identity system, access controls, consent records, and legally compliant health-data safeguards before clinical use."],
     ],
   },

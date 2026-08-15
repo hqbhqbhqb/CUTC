@@ -31,7 +31,7 @@ function ReminderSettings() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState("");
-  const [provider, setProvider] = useState({ loading: true, configured: false, scheduleDays: 14 });
+  const [provider, setProvider] = useState({ loading: true, configured: false, name: "brevo", scheduleHours: 72 });
   const [includeDetails, setIncludeDetails] = useState(Boolean(emailReminderState?.includeDetails));
 
   useEffect(() => {
@@ -42,10 +42,10 @@ function ReminderSettings() {
         return response.json();
       })
       .then((result) => {
-        if (!cancelled) setProvider({ loading: false, configured: Boolean(result.configured), scheduleDays: result.scheduleDays || 14 });
+        if (!cancelled) setProvider({ loading: false, configured: Boolean(result.configured), name: result.provider || "brevo", scheduleHours: result.scheduleHours || 72 });
       })
       .catch(() => {
-        if (!cancelled) setProvider({ loading: false, configured: false, scheduleDays: 14 });
+        if (!cancelled) setProvider({ loading: false, configured: false, name: "brevo", scheduleHours: 72 });
       });
     return () => { cancelled = true; };
   }, []);
@@ -68,7 +68,7 @@ function ReminderSettings() {
 
   useEffect(() => {
     if (renewalHandledRef.current || !emailReminderState?.enabled || !emailReminderState.scheduledUntil) return;
-    const expiresSoon = new Date(emailReminderState.scheduledUntil).getTime() - Date.now() < 3 * 24 * 60 * 60_000;
+    const expiresSoon = new Date(emailReminderState.scheduledUntil).getTime() - Date.now() < 24 * 60 * 60_000;
     const scheduleUnchanged = emailReminderState.medicationSignature === emailMedicationSignature;
     if (!expiresSoon || !scheduleUnchanged || !provider.configured) return;
     renewalHandledRef.current = true;
@@ -169,7 +169,7 @@ function ReminderSettings() {
           {provider.loading ? (
             <div className="mt-5 flex items-center gap-2 rounded-xl bg-[#f5f8f7] p-3 text-xs text-[#71827e]"><LoaderCircle className="animate-spin" size={15} /> Checking email service...</div>
           ) : !provider.configured ? (
-            <div className="mt-5 flex items-start gap-2 rounded-xl bg-[#fff7e8] p-3 text-xs leading-5 text-[#765c2f]"><TriangleAlert size={16} className="mt-0.5 shrink-0" /> The deployment needs a server-only <code className="font-bold">RESEND_API_KEY</code> before email can be sent. No key is exposed to the browser.</div>
+            <div className="mt-5 flex items-start gap-2 rounded-xl bg-[#fff7e8] p-3 text-xs leading-5 text-[#765c2f]"><TriangleAlert size={16} className="mt-0.5 shrink-0" /> The deployment needs a server-only <code className="font-bold">BREVO_API_KEY</code> and verified <code className="font-bold">BREVO_SENDER_EMAIL</code>. No key is exposed to the browser.</div>
           ) : emailReminderState?.enabled ? (
             <div className="mt-5 space-y-3">
               <div className="rounded-xl bg-[#edf7f4] p-3 text-xs leading-5 text-[#45655f]"><CheckCircle2 className="mr-1.5 inline text-[#247568]" size={15} /> {emailReminderState.reminderCount} pending emails · through {formatDate(emailReminderState.scheduledUntil)}</div>
@@ -182,7 +182,7 @@ function ReminderSettings() {
             </div>
           ) : (
             <div className="mt-5">
-              <p className="text-xs leading-5 text-[#71827e]">A one-time email link verifies ownership before reminders are scheduled for the next {provider.scheduleDays} days.</p>
+              <p className="text-xs leading-5 text-[#71827e]">A one-time email link verifies ownership before Brevo schedules reminders for the next {provider.scheduleHours} hours. The window renews when Profile is reopened.</p>
               <Button type="button" variant="secondary" onClick={sendVerification} disabled={Boolean(busy)} className="mt-3 flex w-full items-center justify-center gap-2">
                 {busy === "request" || busy === "verify" ? <LoaderCircle className="animate-spin" size={16} /> : <ShieldCheck size={16} />}
                 {busy === "verify" ? "Scheduling reminders..." : "Verify and enable email"}
